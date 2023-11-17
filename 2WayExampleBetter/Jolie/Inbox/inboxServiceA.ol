@@ -63,7 +63,7 @@ service Inbox (p: InboxEmbeddingConfig){
         })( MessageRetriever.location )
         
         // Make sure that the transaction service we're talking to is the same one as Service A.
-        TransactionService.Location = p.transactionServiceLocation
+        TransactionService.location = p.transactionServiceLocation
         scope ( createtable ) 
         {
             connect@Database( p.databaseConnectionInfo )()
@@ -87,20 +87,25 @@ service Inbox (p: InboxEmbeddingConfig){
                     // | 'operation':'parameter(s)'|   'false'   |  NULL  |
                     // |——————————————————————————————————————————————————|
                 // Insert the update into the 'inbox' table
-                update@Database("INSERT INTO inbox (request, hasBeenRead, kafkaOffset) VALUES (\"udateNumber:" + req.username + "\", false, NULL)")()
+                update@Database("INSERT INTO inbox (request, hasBeenRead, kafkaOffset) VALUES ('udateNumber:" + req.username + "', false, NULL)")()
             }
             res << "Message stored"
         }] 
         {
+            // Initialize a new transaction to pass onto Service A
             initializeTransaction@TransactionService()(tHandle)
 
+            // Within that transaction, update the inbox table for the received message to indicate that it has been read
             with (updateRequest){
+                .update = "UPDATE inbox SET hasBeenRead = true WHERE kafkaOffset = NULL AND hasBeenRead = false"
                 .handle = tHandle
-                .update = "UPDATE inbox SET hasBeenRead = true WHERE kafkaOffset = NULL && hasBeenRead = false"
             }
-            executeUpdate@TransactionService(updateRequest)()
+
+            executeUpdate@TransactionService( updateRequest )( updateResponse )
             
             req.handle = tHandle
+
+            // Call the corresponding operation at Service A
             updateNumber@EmbedderInput( req )( embedderResponse )
         }
 
@@ -120,23 +125,27 @@ service Inbox (p: InboxEmbeddingConfig){
                     // | 'operation':'parameter(s)'|   'false'   | offset |
                     // |——————————————————————————————————————————————————|
                 update@Database("INSERT INTO inbox (request, hasBeenRead, kafkaOffset) VALUES (
-                    \""+ req.key + ":" + req.value +        // numbersUpdated:user1
-                    "\", false, " +                         // false
+                    '"+ req.key + ":" + req.value +        // numbersUpdated:user1
+                    "', false, " +                         // false
                     req.offset + ")")()                           // offset
             }
             res << "Message stored"
         }] 
         {   
+            // Initialize a new transaction to pass onto Service A
             initializeTransaction@TransactionService()(tHandle)
 
             with (updateRequest){
                 .handle = tHandle
                 .update = "UPDATE inbox SET hasBeenRead = true WHERE kafkaOffset = NULL && hasBeenRead = false"
             }
+
+            // Within that transaction, update the inbox table for the received message to indicate that it has been read
             executeUpdate@TransactionService(updateRequest)()
             
             req.handle = tHandle
-            // In the future, we might use Reflection to hit the correct method in the embedder.
+
+            // Call the corresponding operation at Service A
             finalizeChoreography@EmbedderInput(req.offset)
         }
     }

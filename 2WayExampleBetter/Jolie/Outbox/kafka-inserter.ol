@@ -1,5 +1,12 @@
 include "Outbox/outboxTypes.iol"
 
+type KafkaMessage {
+    .topic: string
+    .key: string
+    .value: string
+    .brokerOptions: KafkaOptions
+}
+
 interface KafkaInserterInterface {
     RequestResponse: 
         propagateMessage( KafkaMessage )( StatusResponse ),

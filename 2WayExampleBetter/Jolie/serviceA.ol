@@ -6,7 +6,7 @@ include "string_utils.iol"
 include "serviceAInterface.iol"
 
 from runtime import Runtime
-from .Outbox.outboxService import OutboxInterface
+from .Outbox.outboxService import Outbox
 from .TransactionService.transactionService import TransactionService
 
 service ServiceA{
@@ -18,14 +18,7 @@ service ServiceA{
         }
         interfaces: ServiceAInterface
     }
-
-    outputPort OutboxService {
-        Location: "local"
-        protocol: http{
-            format = "json"
-        }
-        Interfaces: OutboxInterface
-    }
+    embed Outbox as OutboxService
     embed TransactionService as TransactionService
     embed Runtime as Runtime
 
@@ -54,19 +47,15 @@ service ServiceA{
         } )( inbox.location )
 
         // Load the outbox service as an embedded service
-        println@Console( "1" )(  )
-        loadEmbeddedService@Runtime( {
-            filepath = "Outbox/outboxService.ol"
-            params << { 
-                pollSettings << config.pollOptions;
-                databaseConnectionInfo << config.serviceAConnectionInfo;
-                brokerOptions << config.kafkaOutboxOptions;
-                transactionServiceLocation << TransactionService.location
-            }
-        } )( OutboxService.location )    // It is very important that this is a lower-case 'location', otherwise it doesn't work
-                                        // Guess how long it took me to figure that out :)
+        with (outboxSettings){
+            .pollSettings << config.pollOptions;
+            .databaseConnectionInfo << config.serviceAConnectionInfo;
+            .brokerOptions << config.kafkaOutboxOptions;
+            .transactionServiceLocation << TransactionService.location
+        }
+
+        connectKafka@OutboxService(outboxSettings)
         
-        println@Console("3")()
         
         // Connect the TransactionService to the database 
         connect@TransactionService( config.serviceAConnectionInfo )( void )
@@ -86,12 +75,7 @@ service ServiceA{
             '
             // Create the table 
             executeUpdate@TransactionService( createTableRequest )( createTableResponse )
-            if ( createTableResponse > 0 ) {
-                println@Console("Local state initialized for Service A")()
-                commit@TransactionService( tHandle )( )
-            } else {
-                println@Console("Error in initializing local state for Service A")()
-            }
+            commit@TransactionService( tHandle )( )
         }
     }
 
@@ -108,16 +92,16 @@ service ServiceA{
 
                 // Check if the user exists, or if it needs to be created
                 with ( userExistsQuery ){
-                    .query = "SELECT * FROM Numbers WHERE username = \"" + username + "\"";
+                    .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "';";
                     .handle = req.handle
                 }
                 executeQuery@TransactionService( userExistsQuery )( userExists )
                 
                 updateQuery.handle = req.handle
                 if (#userExists.row < 1){
-                    updateQuery.update = "INSERT INTO Numbers VALUES (\"" + username + "\", 0);"
+                    updateQuery.update = "INSERT INTO Numbers VALUES ('" + req.username + "', 0);"
                 } else{
-                    updateQuery.update = "UPDATE Numbers SET number = number + 1 WHERE username = \"" + username + "\""
+                    updateQuery.update = "UPDATE Numbers SET number = number + 1 WHERE username = '" + req.username + "'"
                 }
 
                 executeUpdate@TransactionService( updateQuery )( updateResponse )
@@ -129,11 +113,11 @@ service ServiceA{
                 }
                 
                 with ( outboxQuery ){
-                    .tHandle = req.handle
-                    .commitTransaction = true
-                    .topic = config.kafkaOutboxOptions.topic
-                    .key = "updateNumber"
-                    .value = username
+                    .tHandle = req.handle;
+                    .commitTransaction = true;
+                    .topic = config.kafkaOutboxOptions.topic;
+                    .key = "updateNumber";
+                    .value = req.username
                 }
 
                 updateOutbox@OutboxService( outboxQuery )( updateResponse )
