@@ -4,7 +4,7 @@ type UpdateNumberRequest {
 }
 
 type FinalizeChoreographyRequest {
-    .finishedKafkaMessageOffset: long
+    .username: string
     .handle[0,1]: string
 }
 

@@ -1,6 +1,8 @@
 from console import Console
 from database import Database
 from runtime import Runtime
+from json-utils import JsonUtils
+from reflection import Reflection
 
 from .inboxTypes import InboxEmbeddingConfig, InboxInterface
 from ..serviceAInterface import ServiceAInterface
@@ -44,9 +46,11 @@ service Inbox (p: InboxEmbeddingConfig){
         Interfaces: TransactionServiceInterface
     }
 
-    embed Runtime as Runtime
     embed Console as Console
     embed Database as Database
+    embed JsonUtils as JsonUtils
+    embed Reflection as Reflection
+    embed Runtime as Runtime
 
     init
     {
@@ -62,7 +66,8 @@ service Inbox (p: InboxEmbeddingConfig){
         getLocalLocation@Runtime(  )( localLocation )
         loadEmbeddedService@Runtime({
             filepath = "messageRetrieverService.ol"
-            params << { 
+            params << 
+            { 
                 inboxServiceLocation << localLocation
                 kafkaPollOptions << p.kafkaPollOptions
                 kafkaInboxOptions << p.kafkaInboxOptions
@@ -78,20 +83,22 @@ service Inbox (p: InboxEmbeddingConfig){
     }
 
     main{
-        [updateNumber( req )( res ){
+        [updateNumber( req )( res )
+        {
             // This method takes messages which come from outside the Jolie runtime, and stores them in the inbox
             // It is assumed that every message is unique, otherwise the protocol must dictate some id for incomming messages
 
-            scope( MakeIdempotent ){
+            scope( MakeIdempotent )
+            {
                 // This should never throw, since the offset is set to NULL. We assume all external messages are unique for now
-                install( SQLException => println@Console("Message already recieved, commit request")() )
                 // Insert the request into the inbox table in the form:
                     // ___________________________________________________
                     // |            request        | hasBeenRead | offset |
                     // |———————————————————————————|—————————————|————————|
                     // | 'operation':'parameter(s)'|   'false'   |  NULL  |
                     // |——————————————————————————————————————————————————|
-                // Insert the update into the 'inbox' table
+
+                install( SQLException => println@Console("Message already recieved, commit request")() )
                 update@Database("INSERT INTO inbox (request, hasBeenRead, kafkaOffset) VALUES ('udateNumber:" + req.username + "', false, NULL)")()
             }
             res << "Message stored"
@@ -101,7 +108,8 @@ service Inbox (p: InboxEmbeddingConfig){
             initializeTransaction@TransactionService()(tHandle)
 
             // Within that transaction, update the inbox table for the received message to indicate that it has been read
-            with (updateRequest){
+            with (updateRequest)
+            {
                 .update = "UPDATE inbox SET hasBeenRead = true WHERE kafkaOffset = NULL AND hasBeenRead = false"
                 .handle = tHandle
             }
@@ -114,22 +122,24 @@ service Inbox (p: InboxEmbeddingConfig){
             updateNumber@Embedder( req )( embedderResponse )
         }
 
-        [recieveKafka( req )( res ) {
+        [recieveKafka( req )( res ) 
+        {
             // Kafka messages for our inbox/outbox contains the operation invoked in the 'key', and the parameters in the 'value'
-            connect@Database(config.serviceAConnectionInfo)()
-            scope( MakeIdempotent ){
-                // If this exception is thrown, Kafka some commit message must have disappeared. Resend it.
-                install( SQLException => {
+            scope( MakeIdempotent )
+            {
+                // Insert the request into the inbox table in the form:
+                    // ______________________________________________________
+                    // |            request          | hasBeenRead | offset |
+                    // |———————————————————————————  |—————————————|————————|
+                    // | operation:request           |   'false'   | offset |
+                    // |————————————————————————————————————————————————————|
+
+                install( SQLException => 
+                {
                     println@Console("Message already recieved, commit request")();
                     res = "Message already recieveid, please re-commit"
                 })
                 
-                // Insert the request into the inbox table in the form:
-                    // ___________________________________________________
-                    // |            request        | hasBeenRead | offset |
-                    // |———————————————————————————|—————————————|————————|
-                    // | 'operation':'parameter(s)'|   'false'   | offset |
-                    // |——————————————————————————————————————————————————|
                 update@Database("INSERT INTO inbox (request, hasBeenRead, kafkaOffset) VALUES (
                     '"+ req.key + ":" + req.value +        // numbersUpdated:user1
                     "', false, " +                         // false
@@ -142,17 +152,24 @@ service Inbox (p: InboxEmbeddingConfig){
             initializeTransaction@TransactionService()(tHandle)
 
             with (updateRequest){
-                .handle = tHandle
-                .update = "UPDATE inbox SET hasBeenRead = true WHERE kafkaOffset = NULL && hasBeenRead = false"
+                .handle = tHandle;
+                .update = "UPDATE inbox SET hasBeenRead = true WHERE kafkaOffset = " + req.offset + " AND hasBeenRead = false"
             }
 
             // Within that transaction, update the inbox table for the received message to indicate that it has been read
             executeUpdate@TransactionService(updateRequest)()
             
-            req.handle = tHandle
+            getJsonValue@JsonUtils(req.value)(finalizeRequest)
+            finalizeRequest.handle = tHandle
 
             // Call the corresponding operation at Service A
-            finalizeChoreography@Embedder(req.offset)
+            with( embedderInvokationRequest ){
+                .outputPort = "Embedder";
+                .data << finalizeRequest;
+                .operation = req.key
+            }
+
+            invoke@Reflection( embedderInvokationRequest )()
         }
     }
 }

@@ -2,7 +2,7 @@
   "serviceAConnectionInfo": {
     "username": "postgres",
     "password": "example",
-    "database": "example-db",
+    "database": "service-a-db",
     "driver": "postgresql",
     "host": ""
   },

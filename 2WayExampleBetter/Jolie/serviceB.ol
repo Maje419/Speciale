@@ -1,9 +1,8 @@
-include "serviceBInterface.iol"
-
 from database import Database
 from console import Console
 from file import File
 from runtime import Runtime
+from json-utils import JsonUtils
 
 from .serviceBInterface import ServiceBInterface
 from .Outbox.outboxService import OutboxInterface
@@ -31,11 +30,11 @@ service ServiceB{
     embed Console as Console
     embed Database as Database
     embed File as File
+    embed JsonUtils as JsonUtils
     embed Runtime as Runtime
     embed TransactionService as TransactionService
 
     init {
-
         readFile@File(
             {
                 filename = "serviceBConfig.json"
@@ -47,8 +46,10 @@ service ServiceB{
             filepath = "Inbox/inboxServiceB.ol"
             params << { 
                 localLocation << location
-                externalLocation << "socket://localhost:8082"       //This doesn't work for some reason
-                configFile = "serviceBConfig.json"
+                databaseConnectionInfo << config.serviceBConnectionInfo
+                transactionServiceLocation << TransactionService.location   // All embedded services must talk to the same instance of 'TransactionServie'
+                kafkaPollOptions << config.pollOptions
+                kafkaInboxOptions << config.kafkaInboxOptions
             }
         } )( )
 
@@ -57,7 +58,7 @@ service ServiceB{
             filepath = "Outbox/outboxService.ol"
             params << { 
                 pollSettings << config.pollOptions;
-                databaseConnectionInfo << config.serviceAConnectionInfo;
+                databaseConnectionInfo << config.serviceBConnectionInfo;
                 brokerOptions << config.kafkaOutboxOptions;
                 transactionServiceLocation << TransactionService.location
             }
@@ -76,52 +77,43 @@ service ServiceB{
 
     main 
     {
-        [numbersUpdated( request )]
-        {
-            println@Console("ServiceB: \t numbersUpdated called with username " + req.username)()
-
-            scope (ForceSequentialDatabaseAccess)
+        [numbersUpdated( req )]
+        {   
+            with ( userExistsQuery ){
+                .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "'";
+                .handle = req.handle
+            }
+            executeQuery@TransactionService( userExistsQuery )( userExists )
+                
+            // Construct query which updates local state:
+            if (#userExists.row < 1)
             {
-                connect@Database( config.serviceBConnectionInfo )( void )
-                query@Database( "SELECT * FROM inbox WHERE hasBeenRead = false" )( inboxMessages )
+                localUpdate.update = "INSERT INTO Numbers VALUES ('" + req.username + "', 0);"
+            } 
+            else
+            {
+                localUpdate.update = "UPDATE Numbers SET number = number + 1 WHERE username = '" + req.username + "'"
             }
 
-            for ( row in inboxMessages.row ) 
-            {
-                println@Console("ServiceB: Checking inbox found update request " + row.request)()
-                row.request.regex = ":"
-                split@StringUtils( row.request )( splitResult )
-                username = splitResult.result[1]
-                query@Database("SELECT * FROM Numbers WHERE username = \"" + username + "\"")( userExists )
-                
-                // Construct query which updates local state:
-                if (#userExists.row < 1)
-                {
-                    localUpdateQuery = "INSERT INTO Numbers VALUES (\"" + username + "\", 0);"
-                } 
-                else
-                {
-                    localUpdateQuery = "UPDATE Numbers SET number = number + 1 WHERE username = \"" + username + "\""
-                }
+            localUpdate.handle = req.handle
 
-                // Construct query to delete message row from inbox table
-                inboxDeleteQuery = "UPDATE inbox SET hasBeenRead = true WHERE rowid = " + row.rowid
-                //TODO: The above query does not consider that kafkaOffset can be NULL for messages not coming out of Kafka.
-                        // In this case, it doesn't matter, since all messages come from kafka, but in a more advanced example
-                        // it might be a problem
+            executeUpdate@TransactionService( localUpdate )()
 
-                scope (ExecuteQueries)
-                {
-                    updateQuery.sqlQuery[0] = localUpdateQuery
-                    updateQuery.sqlQuery[1] = inboxDeleteQuery
-                
-                    updateQuery.topic = config.kafkaOutboxOptions.topic
-                    updateQuery.key = "numbersUpdated"
-                    updateQuery.value = username
-                    transactionalOutboxUpdate@OutboxService( updateQuery )( updateResponse )
-                    println@Console("Service B has updated locally")()
-                }
+            with ( finalizeChoreographyRequest ){
+                .username = req.username
             }
+            with ( outboxQuery ){
+                    .tHandle = req.handle;
+                    .commitTransaction = true;
+                    .topic = config.kafkaOutboxOptions.topic;
+                    .operation = "finalizeChoreography"
+            }
+            getJsonString@JsonUtils( finalizeChoreographyRequest )( outboxQuery.data )
+
+            println@Console("data: " + outboxQuery.data)()
+
+            updateOutbox@OutboxService( outboxQuery )( updateResponse )
+            println@Console("Service B has updated locally")()
         }
     }
 }

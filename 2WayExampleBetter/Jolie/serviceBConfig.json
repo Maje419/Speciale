@@ -1,10 +1,10 @@
 {
   "serviceBConnectionInfo": {
+    "username": "postgres",
     "password": "example",
-    "database": "file:serviceBDb.sqlite",
+    "database": "service-b-db",
     "driver": "postgresql",
-    "host": "",
-    "username": ""
+    "host": ""
   },
   "pollOptions": {
     "pollDurationMS": 3000,

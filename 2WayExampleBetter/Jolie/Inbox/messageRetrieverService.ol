@@ -6,7 +6,7 @@ from .kafka-retriever import KafkaConsumer
 
 service MessageRetriever(p: MRSEmbeddingConfig) {
     // This port is used to notify the inbox service of new messages
-    outputPort InboxPort {
+    outputPort InboxService {
         location: "local"
         protocol: http{
             format = "json"
@@ -20,7 +20,7 @@ service MessageRetriever(p: MRSEmbeddingConfig) {
     init
     {
         // Overwrite so we can contact the Inbox Service
-        InboxPort.location << p.localLocation
+        InboxService.location << p.inboxServiceLocation
 
         println@Console(" poll: " + p.pollOptions.pollDurationMS )(  )
 
@@ -36,19 +36,19 @@ service MessageRetriever(p: MRSEmbeddingConfig) {
 
     main
     {
-        
-        consumeRequest.timeoutMs = 3000
-
-        while (true) {
-            consume@KafkaConsumer( consumeRequest )( consumeResponse )
+        while (true) 
+        {
+            consume@KafkaConsumer( {timeoutMs = 3000} )( consumeResponse )
             println@Console( "InboxService: Received " + #consumeResponse.messages + " messages from KafkaConsumerService" )(  )
 
-            for ( i = 0, i < #consumeResponse.messages, i++ ) {
+            for ( i = 0, i < #consumeResponse.messages, i++ ) 
+            {
                 println@Console( "InboxService: Retrieved message: " + consumeResponse.messages[i].value + " at offset " + consumeResponse.messages[i].offset)( )
                 recievedKafkaMessage << consumeResponse.messages[i]
-                recieveKafka@InboxPort( recievedKafkaMessage )( recievedKafkaMessageResponse )
+                recieveKafka@InboxService( recievedKafkaMessage )( recievedKafkaMessageResponse )
                 if ( recievedKafkaMessageResponse == "Message stored" ||
-                     recievedKafkaMessageResponse == "Message already recieveid, please re-commit" ){
+                     recievedKafkaMessageResponse == "Message already recieveid, please re-commit" )
+                {
                     commitRequest.offset = consumeResponse.messages[i].offset
                     commit@KafkaConsumer( commitRequest )( commitResponse )
                 }

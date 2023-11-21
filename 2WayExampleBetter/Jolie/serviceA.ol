@@ -2,6 +2,7 @@ from database import Database
 from console import Console
 from file import File
 from runtime import Runtime
+from json-utils import JsonUtils
 
 from .serviceAInterface import ServiceAInterface
 from .Outbox.outboxService import OutboxInterface
@@ -29,6 +30,7 @@ service ServiceA{
     }
     embed File as File
     embed Console as Console
+    embed JsonUtils as JsonUtils
     embed TransactionService as TransactionService
     embed Runtime as Runtime
 
@@ -84,7 +86,7 @@ service ServiceA{
                 "number int)";
                 .handle = tHandle
             }
-            '
+            
             // Create the table 
             executeUpdate@TransactionService( createTableRequest )( createTableResponse )
             commit@TransactionService( tHandle )( )
@@ -99,7 +101,7 @@ service ServiceA{
         {
             println@Console("ServiceA: \tUpdateNumber called with username " + req.username)()
             scope ( UpdateLocalState )    //Update the local state of Service A
-            {   
+            {
                 install ( SQLException => println@Console( "SQL exception occured in Service A while updating local state" )( ) )
 
                 // Check if the user exists, or if it needs to be created
@@ -109,31 +111,27 @@ service ServiceA{
                 }
                 executeQuery@TransactionService( userExistsQuery )( userExists )
                 
+                // Create user if needed, otherwise update the number for the user
                 updateQuery.handle = req.handle
                 if (#userExists.row < 1){
                     updateQuery.update = "INSERT INTO Numbers VALUES ('" + req.username + "', 0);"
                 } else{
                     updateQuery.update = "UPDATE Numbers SET number = number + 1 WHERE username = '" + req.username + "'"
                 }
-
-                println@Console("1")()
                 executeUpdate@TransactionService( updateQuery )( updateResponse )
 
-                if ( updateResponse > 0){       // Some row(s) were updated
-                    println@Console("\n Service A has executed update: " + updateQuery.update + "\n")()
-                } else {    // Some error might have occured.
-                    println@Console("No rows were update in Service A!")()
-                }
-                
+                // To update Service B, this service needs to communicate to its outbox that it should put a message
+                // into kafka containing the operation and the request that we seek to call at                
                 with ( outboxQuery ){
-                    .tHandle = req.handle;
-                    .commitTransaction = true;
-                    .topic = config.kafkaOutboxOptions.topic;
-                    .key = "updateNumber";
-                    .value = req.username
+                    .tHandle = req.handle;                          // The transaction handle for the ongoing transaction
+                    .commitTransaction = true;                      // No other updates should come to this transaction, so commit it.
+                    .topic = config.kafkaOutboxOptions.topic;       // .topic = "a-out", which is where service B inbox listens
+                    .operation = "numbersUpdated"                   // This service wants to call serviceB.numbersUpdated
                 }
 
-                println@Console("2")()
+                // Parse the request that was supposed to be sent to serviceB into a json string, and enter it into the kafak message.value
+                getJsonString@JsonUtils( {.username = req.username} )(outboxQuery.data)
+
                 updateOutbox@OutboxService( outboxQuery )( updateResponse )
                 res = "Choreography Started!"
             }
@@ -141,7 +139,7 @@ service ServiceA{
 
         [finalizeChoreography( req )]{
             commit@TransactionService( req.handle )( result )
-            println@Console("Finished choreography")()
+            println@Console("Finished choreography for user " + req.username)()
         }
     }
 }

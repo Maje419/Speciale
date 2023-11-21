@@ -21,9 +21,13 @@ type UpdateRequest{
 type UpdateResponse: int
 
 
-interface TransactionServiceInterface {
+interface TransactionServiceSetup {
     RequestResponse: 
-        connect( ConnectRequest ) ( ConnectResponse ),
+        connect( ConnectRequest ) ( ConnectResponse )
+}
+
+interface TransactionServiceOperations {
+    RequestResponse:
         initializeTransaction( void )( TransactionHandle ),
         executeQuery( QueryRequest )( QueryResult ),
         executeUpdate( UpdateRequest )( UpdateResponse ),
@@ -33,7 +37,7 @@ interface TransactionServiceInterface {
 service TransactionService{
     inputPort Input {
         Location: "local"
-        Interfaces: TransactionServiceInterface
+        Interfaces: TransactionServiceSetup, TransactionServiceOperations
         } 
         foreign java {
             class: "jolie.transactionservice.TransactionService"

@@ -79,7 +79,7 @@ service Outbox(p: OutboxSettings){
                 res.success = false
             })
 
-            updateOutboxTable = "INSERT INTO outbox (kafkaKey, kafkaValue) VALUES ('" + req.key + "', '" + req.value + "');" 
+            updateOutboxTable = "INSERT INTO outbox (kafkaKey, kafkaValue) VALUES ('" + req.operation + "', '" + req.data + "');" 
 
             with ( updateRequest ){
                 .handle = req.tHandle;

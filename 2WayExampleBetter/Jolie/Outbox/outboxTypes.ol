@@ -12,10 +12,10 @@ type PollSettings: void{
 }
 
 type UpdateOutboxRequest{
-    .tHandle: string                                     // The transaction handle
+    .tHandle: string                                    // The transaction handle
     .commitTransaction: bool                            // If true, the transaction will be commited after executing sqlQuery
-    .key: string                                        // The key to use in the kafka message
-    .value: string                                      // The value for the kafka message
+    .operation: string                                  // The operation to be called on the receiver service
+    .data: string                                       // A json representation of the request to pass to .operation
     .topic: string                                      // The kafka topic on which the update should be broadcast
 }
 
