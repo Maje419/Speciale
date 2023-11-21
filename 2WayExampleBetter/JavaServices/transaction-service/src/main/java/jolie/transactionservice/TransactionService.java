@@ -176,6 +176,7 @@ public class TransactionService extends JavaService {
     }
 
     public Value executeUpdate(Value input) throws FaultException {
+        System.out.println("01");
         String transactionHandle = input.getFirstChild("handle").strValue();
         String query = input.getFirstChild("update").strValue();
 
@@ -183,15 +184,17 @@ public class TransactionService extends JavaService {
         try {
             // Execute an update on an open connection.
             Connection con = m_openTransactions.get(transactionHandle);
+            System.out.println("02");
 
             if (con == null) {
                 throw new FaultException("ConnectionClosed",
                         "No connection with transaction handle " + transactionHandle + " is open.");
             }
+            System.out.println("03");
 
             PreparedStatement statement = con.prepareStatement(query);
             int numberRowsUpdated = statement.executeUpdate();
-
+            System.out.println("04");
             // Return the number of rows affected by the update
             response.setValue(numberRowsUpdated);
             return response;

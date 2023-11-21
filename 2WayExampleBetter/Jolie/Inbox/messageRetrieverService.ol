@@ -1,9 +1,7 @@
-include "console.iol"
-include "time.iol"
-include "file.iol"
-include "database.iol"
-include "inboxTypes.iol"
+from console import Console
+from time import Time
 
+from .inboxTypes import InboxInterface, MRSEmbeddingConfig
 from .kafka-retriever import KafkaConsumer
 
 service MessageRetriever(p: MRSEmbeddingConfig) {
@@ -16,6 +14,8 @@ service MessageRetriever(p: MRSEmbeddingConfig) {
         interfaces: InboxInterface            
     }
     embed KafkaConsumer as KafkaConsumer
+    embed Time as Time
+    embed Console as Console 
 
     init
     {

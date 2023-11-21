@@ -1,16 +1,16 @@
-include "database.iol"
-include "console.iol"
-include "time.iol"
-include "file.iol"
-include "string_utils.iol" 
-include "serviceAInterface.iol"
-
+from database import Database
+from console import Console
+from file import File
 from runtime import Runtime
-from .Outbox.outboxService import Outbox
+
+from .serviceAInterface import ServiceAInterface
+from .Outbox.outboxService import OutboxInterface
 from .TransactionService.transactionService import TransactionService
 
 service ServiceA{
     execution: concurrent
+
+    // We only need to receive on local, since Inbox will handle external messages
     inputPort ServiceALocal {
         location: "local" 
         protocol: http{
@@ -18,7 +18,17 @@ service ServiceA{
         }
         interfaces: ServiceAInterface
     }
-    embed Outbox as OutboxService
+
+    // We need to be able to send messages to the Outbox Service to tell it what to put in the outbox
+    outputPort OutboxService {
+        Location: "local"
+        protocol: http{
+            format = "json"
+        }
+        Interfaces: OutboxInterface
+    }
+    embed File as File
+    embed Console as Console
     embed TransactionService as TransactionService
     embed Runtime as Runtime
 
@@ -44,17 +54,19 @@ service ServiceA{
                 kafkaPollOptions << config.pollOptions
                 kafkaInboxOptions << config.kafkaInboxOptions
             }
-        } )( inbox.location )
+        } )( )
 
         // Load the outbox service as an embedded service
-        with (outboxSettings){
-            .pollSettings << config.pollOptions;
-            .databaseConnectionInfo << config.serviceAConnectionInfo;
-            .brokerOptions << config.kafkaOutboxOptions;
-            .transactionServiceLocation << TransactionService.location
-        }
-
-        connectKafka@OutboxService(outboxSettings)
+        loadEmbeddedService@Runtime( {
+            filepath = "Outbox/outboxService.ol"
+            params << { 
+                pollSettings << config.pollOptions;
+                databaseConnectionInfo << config.serviceAConnectionInfo;
+                brokerOptions << config.kafkaOutboxOptions;
+                transactionServiceLocation << TransactionService.location
+            }
+        } )( OutboxService.location )    // It is very important that this is a lower-case 'location', otherwise it doesn't work
+                                        // Guess how long it took me to figure that out :)
         
         
         // Connect the TransactionService to the database 
@@ -104,6 +116,7 @@ service ServiceA{
                     updateQuery.update = "UPDATE Numbers SET number = number + 1 WHERE username = '" + req.username + "'"
                 }
 
+                println@Console("1")()
                 executeUpdate@TransactionService( updateQuery )( updateResponse )
 
                 if ( updateResponse > 0){       // Some row(s) were updated
@@ -120,6 +133,7 @@ service ServiceA{
                     .value = req.username
                 }
 
+                println@Console("2")()
                 updateOutbox@OutboxService( outboxQuery )( updateResponse )
                 res = "Choreography Started!"
             }

@@ -1,17 +1,8 @@
-include "database.iol"
-include "time.iol"
-include "console.iol"
-include "Outbox/outboxTypes.iol"
-
+from .outboxTypes import ForwarderServiceInfo
 from .kafka-inserter import KafkaInserter
-
-type ForwarderServiceInfo {
-    .databaseConnectionInfo: ConnectionInfo     // The connectioninfo used to connect to the database. See docs the Database module.
-    .pollSettings: PollSettings                 // The settings to use
-    .columnSettings: ColumnSettings            // The names of the columns in the 'outbox' table
-    .brokerOptions: KafkaOptions
-}
-
+from time import Time
+from database import Database
+from console import Console
 interface MessageForwarderInterface {
     OneWay: startReadingMessages ( ForwarderServiceInfo )
 }
@@ -27,6 +18,9 @@ service MessageForwarderService{
         Interfaces: MessageForwarderInterface
     }
     embed KafkaInserter as KafkaInserter
+    embed Time as Time
+    embed Database as Database
+    embed Console as Console
 
     // Starts this service reading continually from the 'outbox' table
     main{
@@ -43,7 +37,6 @@ service MessageForwarderService{
                     println@Console( "OutboxMessageForwarder: \tForwarding " +  #pulledMessages.row + " messages into kafka!")(  )
 
                     for ( databaseMessage in pulledMessages.row ){
-                        println@Console("Value: " + databaseMessage.kafkavalue)()
                         kafkaMessage.topic = request.brokerOptions.topic
                         kafkaMessage.key = databaseMessage.kafkakey
                         kafkaMessage.value = databaseMessage.kafkavalue
@@ -52,7 +45,7 @@ service MessageForwarderService{
                         propagateMessage@KafkaInserter( kafkaMessage )( kafkaResponse )
 
                         println@Console( "Response status: " + kafkaResponse.success )(  )
-                        if (kafkaResponse.success) {
+                        if ( kafkaResponse.success ) {
                             deleteQuery = "DELETE FROM outbox WHERE  mid = " + databaseMessage.mid
                             println@Console( "OutboxMessageForwarder: \tExecuting query '" + deleteQuery + "'")(  )
                             update@Database( deleteQuery )( updateResponse )

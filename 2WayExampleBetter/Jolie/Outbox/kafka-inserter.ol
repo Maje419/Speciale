@@ -1,11 +1,4 @@
-include "Outbox/outboxTypes.iol"
-
-type KafkaMessage {
-    .topic: string
-    .key: string
-    .value: string
-    .brokerOptions: KafkaOptions
-}
+from .outboxTypes import KafkaMessage, StatusResponse
 
 interface KafkaInserterInterface {
     RequestResponse: 

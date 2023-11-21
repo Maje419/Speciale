@@ -1,13 +1,13 @@
-include "database.iol"
-include "console.iol"
-include "time.iol"
-include "file.iol"
-include "string_utils.iol" 
 include "serviceBInterface.iol"
 
+from database import Database
+from console import Console
+from file import File
 from runtime import Runtime
-from .Outbox.outboxService import Outbox
-from .Inbox.inboxServiceB import Inbox
+
+from .serviceBInterface import ServiceBInterface
+from .Outbox.outboxService import OutboxInterface
+from .TransactionService.transactionService import TransactionService
 
 service ServiceB{
     execution: concurrent
@@ -20,21 +20,21 @@ service ServiceB{
         interfaces: ServiceBInterface
     }
 
-    // TODO: Embed the outbox service dynamically to avoid having to call ConnectKafka to it
-    embed Outbox as OutboxService
-    // inbox service is loaded dynamically in the 'init' function
+    outputPort OutboxService {
+        Location: "local"
+        Protocol: http{
+            format = "json"
+        }
+        Interfaces: OutboxInterface
+    }
+
+    embed Console as Console
+    embed Database as Database
+    embed File as File
     embed Runtime as Runtime
+    embed TransactionService as TransactionService
 
     init {
-        getLocalLocation@Runtime()( location )
-        loadEmbeddedService@Runtime( { 
-            filepath = "Inbox/inboxServiceB.ol"
-            params << { 
-                localLocation << location
-                externalLocation << "socket://localhost:8082"       //This doesn't work
-                configFile = "serviceBConfig.json"
-            }
-        } )( inbox.location )
 
         readFile@File(
             {
@@ -42,15 +42,30 @@ service ServiceB{
                 format = "json"
             }) ( config )
 
-        with ( outboxSettings )
-        {
-            .pollSettings << config.pollOptions;
-            .databaseConnectionInfo << config.serviceBConnectionInfo;
-            .brokerOptions << config.kafkaOutboxOptions
-        }
+        getLocalLocation@Runtime()( location )
+        loadEmbeddedService@Runtime( { 
+            filepath = "Inbox/inboxServiceB.ol"
+            params << { 
+                localLocation << location
+                externalLocation << "socket://localhost:8082"       //This doesn't work for some reason
+                configFile = "serviceBConfig.json"
+            }
+        } )( )
 
-        connectKafka@OutboxService( outboxSettings )
-        connect@Database( config.serviceBConnectionInfo )( void )
+        // Load the outbox service as an embedded service
+        loadEmbeddedService@Runtime( {
+            filepath = "Outbox/outboxService.ol"
+            params << { 
+                pollSettings << config.pollOptions;
+                databaseConnectionInfo << config.serviceAConnectionInfo;
+                brokerOptions << config.kafkaOutboxOptions;
+                transactionServiceLocation << TransactionService.location
+            }
+        } )( OutboxService.location )    // It is very important that this is a lower-case 'location', otherwise it doesn't work
+                                        // Guess how long it took me to figure that out :)
+
+        connect@TransactionService(config.serviceBConnectionInfo)()
+        connect@Database( config.serviceBConnectionInfo )( )
 
         scope ( createtable ) 
         {
@@ -63,6 +78,8 @@ service ServiceB{
     {
         [numbersUpdated( request )]
         {
+            println@Console("ServiceB: \t numbersUpdated called with username " + req.username)()
+
             scope (ForceSequentialDatabaseAccess)
             {
                 connect@Database( config.serviceBConnectionInfo )( void )

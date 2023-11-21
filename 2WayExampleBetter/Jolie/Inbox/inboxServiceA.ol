@@ -1,11 +1,9 @@
-include "console.iol"
-include "time.iol"
-include "database.iol"
-include "file.iol"
-include "Inbox/inboxTypes.iol"
-include "serviceAInterface.iol"
-
+from console import Console
+from database import Database
 from runtime import Runtime
+
+from .inboxTypes import InboxEmbeddingConfig, InboxInterface
+from ..serviceAInterface import ServiceAInterface
 from ..TransactionService.transactionService import TransactionServiceInterface
 
 service Inbox (p: InboxEmbeddingConfig){
@@ -20,7 +18,7 @@ service Inbox (p: InboxEmbeddingConfig){
 
     // This service takes over handling of the external endpoint from the embedder
     inputPort ExternalInput {
-        Location: "socket://localhost:8080"    //It would be nice if this could be sent with as a parameter
+        Location: "socket://localhost:9090"
         Protocol: http{
             format = "json"
         }
@@ -29,7 +27,7 @@ service Inbox (p: InboxEmbeddingConfig){
     }
 
     // Used when forwarding messages back to embedder
-    outputPort EmbedderInput {
+    outputPort Embedder {
         location: "local"   // Overwritten in init
         protocol: http{
             format = "json"
@@ -37,6 +35,7 @@ service Inbox (p: InboxEmbeddingConfig){
         interfaces: ServiceAInterface
     }
 
+    // The TransactionService location needs to be the one initialized in ServiceA
     outputPort TransactionService {
         Location: "local"   // Overwritten in init
         Protocol: http{
@@ -44,35 +43,41 @@ service Inbox (p: InboxEmbeddingConfig){
         }
         Interfaces: TransactionServiceInterface
     }
+
     embed Runtime as Runtime
+    embed Console as Console
+    embed Database as Database
 
     init
     {
-        EmbedderInput.location = p.localLocation
+        // This service takes control of receiving messages from external sources
+        // It then needs to be able to forward the message to its embedder
+        ExternalInput.location = p.externalLocation
+        Embedder.location = p.localLocation
+
+        // Make sure that the transaction service we're talking to is the same one as Service A.
+        TransactionService.location = p.transactionServiceLocation
 
         // The inbox itself embeds MRS, which polls Kafka for updates
-        getLocalLocation@Runtime(  )( localLocation )   
+        getLocalLocation@Runtime(  )( localLocation )
         loadEmbeddedService@Runtime({
             filepath = "messageRetrieverService.ol"
             params << { 
                 inboxServiceLocation << localLocation
                 kafkaPollOptions << p.kafkaPollOptions
                 kafkaInboxOptions << p.kafkaInboxOptions
-
             }
-        })( MessageRetriever.location )
+        })( )
         
-        // Make sure that the transaction service we're talking to is the same one as Service A.
-        TransactionService.location = p.transactionServiceLocation
         scope ( createtable ) 
         {
             connect@Database( p.databaseConnectionInfo )()
             update@Database( "CREATE TABLE IF NOT EXISTS inbox (request VARCHAR (150), hasBeenRead BOOLEAN, kafkaOffset INTEGER, rowid SERIAL PRIMARY KEY, UNIQUE(kafkaOffset));" )( ret )
         }
-        println@Console( "InboxServiceA Initialized" )(  )
+        println@Console( "InboxServiceA Initialized" )( )
     }
+
     main{
-        
         [updateNumber( req )( res ){
             // This method takes messages which come from outside the Jolie runtime, and stores them in the inbox
             // It is assumed that every message is unique, otherwise the protocol must dictate some id for incomming messages
@@ -106,7 +111,7 @@ service Inbox (p: InboxEmbeddingConfig){
             req.handle = tHandle
 
             // Call the corresponding operation at Service A
-            updateNumber@EmbedderInput( req )( embedderResponse )
+            updateNumber@Embedder( req )( embedderResponse )
         }
 
         [recieveKafka( req )( res ) {
@@ -118,6 +123,7 @@ service Inbox (p: InboxEmbeddingConfig){
                     println@Console("Message already recieved, commit request")();
                     res = "Message already recieveid, please re-commit"
                 })
+                
                 // Insert the request into the inbox table in the form:
                     // ___________________________________________________
                     // |            request        | hasBeenRead | offset |
@@ -130,7 +136,7 @@ service Inbox (p: InboxEmbeddingConfig){
                     req.offset + ")")()                           // offset
             }
             res << "Message stored"
-        }] 
+        }]
         {   
             // Initialize a new transaction to pass onto Service A
             initializeTransaction@TransactionService()(tHandle)
@@ -146,7 +152,7 @@ service Inbox (p: InboxEmbeddingConfig){
             req.handle = tHandle
 
             // Call the corresponding operation at Service A
-            finalizeChoreography@EmbedderInput(req.offset)
+            finalizeChoreography@Embedder(req.offset)
         }
     }
 }

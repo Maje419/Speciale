@@ -1,4 +1,4 @@
-//--------------------- Outbox Service Types --------------------//
+from database import ConnectionInfo
 
 type KafkaOptions: void {   
     .topic: string                              // The topic to write updates to
@@ -19,6 +19,13 @@ type UpdateOutboxRequest{
     .topic: string                                      // The kafka topic on which the update should be broadcast
 }
 
+type OutboxSettings{
+    .databaseConnectionInfo: ConnectionInfo             // The connectioninfo used to connect to the database. See docs the Database module.
+    .pollSettings: PollSettings                        // Object of type PollSettings descibing the desired behaviour of the MessageForwarder
+    .brokerOptions: KafkaOptions // RabbitMqOptions
+    .transactionServiceLocation: any                    // The location of the transaction service
+}
+
 type StatusResponse {
     .success: bool
     .message: string
@@ -31,4 +38,16 @@ type ColumnSettings {
     .idColumn: string
 }
 
+type ForwarderServiceInfo {
+    .databaseConnectionInfo: ConnectionInfo     // The connectioninfo used to connect to the database. See docs the Database module.
+    .pollSettings: PollSettings                // The settings to use
+    .columnSettings: ColumnSettings            // The names of the columns in the 'outbox' table
+    .brokerOptions: KafkaOptions
+}
 //-------------------- Kafka Inserter Types -----------------//
+type KafkaMessage {
+    .topic: string
+    .key: string
+    .value: string
+    .brokerOptions: KafkaOptions
+}

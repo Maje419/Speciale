@@ -1,31 +1,20 @@
-include "database.iol"
-include "time.iol"
-include "console.iol"
-include "Outbox/outboxTypes.iol"
-
-from .messageForwarderService import MessageForwarderService
+from .outboxTypes import OutboxSettings, UpdateOutboxRequest, StatusResponse
+from .messageForwarderService import MessageForwarderInterface
 from ..TransactionService.transactionService import TransactionServiceInterface
-
-type OutboxSettings{
-    .databaseConnectionInfo: ConnectionInfo             // The connectioninfo used to connect to the database. See docs the Database module.
-    .pollSettings: PollSettings                         // Object of type PollSettings descibing the desired behaviour of the MessageForwarder
-    .brokerOptions: KafkaOptions // RabbitMqOptions
-    .transactionServiceLocation: any                    // The location of the transaction service
-}
-
+from runtime import Runtime
+from console import Console
+from database import Database
 interface OutboxInterface{
     RequestResponse:
         updateOutbox( UpdateOutboxRequest )( StatusResponse )
-    OneWay:
-        connectKafka( OutboxSettings )
 }
 
 /**
 * This service is used to implement the outbox pattern. Given an SQL query and some message, it will atomically execute the query, as well write the message to a messages table.
 * It will then embeds a 'RelayService', which reads from the 'Messages' table and forwards messages into Kafka.
 */
-service Outbox{
-    execution: sequential
+service Outbox(p: OutboxSettings){
+    execution: concurrent
     inputPort OutboxPort {
         Location: "local"
         Interfaces: OutboxInterface
@@ -38,41 +27,58 @@ service Outbox{
         }
         Interfaces: TransactionServiceInterface
     }
-    embed MessageForwarderService as MFS
-    
-    main {
-        /*
-        * Connect to a Kafka version of this service.
-        */
-        [connectKafka( request ) ]{
-            TransactionService.location = request.transactionServiceLocation;
-            println@Console("OutboxService: \tInitializing connection to Kafka")();
-            connect@TransactionService( request.databaseConnectionInfo )( void )
-            connect@Database( request.databaseConnectionInfo )( void )
-            scope ( createMessagesTable )
-            {
-                install ( SQLException => { println@Console("Error when creating the outbox table for the outbox!")() })
 
-                // Varchar size is not enforced by sqlite, we can insert a string of any length
-                updateRequest = "CREATE TABLE IF NOT EXISTS outbox (kafkaKey VARCHAR(50), kafkaValue VARCHAR (150), mid SERIAL PRIMARY KEY);"
-                update@Database( updateRequest )( ret )
-            }
+    outputPort MFS {
+        Location: "local"   // Overwritten in init
+        Protocol: http{
+            format = "json"
+        }
+        Interfaces: MessageForwarderInterface
+    }
+    embed Runtime as Runtime
+    embed Console as Console
+    embed Database as Database
 
-            relayRequest.databaseConnectionInfo << request.databaseConnectionInfo
-            relayRequest.pollSettings << request.pollSettings
+    init {
+        // Insert location of the transaction service embedded in main service
+        TransactionService.location << p.transactionServiceLocation
 
-            relayRequest.columnSettings.keyColumn = "kafkaKey"
-            relayRequest.columnSettings.valueColumn = "kafkaValue"
-            relayRequest.columnSettings.idColumn = "mid"
-            relayRequest.brokerOptions << request.brokerOptions
-            
-            startReadingMessages@MFS( relayRequest )
+        // Load MFS
+        loadEmbeddedService@Runtime({
+            filepath = "messageForwarderService.ol"
+        })( MFS.location )
+
+        println@Console("OutboxService: \tInitializing connection to Kafka")();
+        connect@TransactionService( p.databaseConnectionInfo )( void )
+        connect@Database( p.databaseConnectionInfo )( void )
+        scope ( createMessagesTable )
+        {
+            install ( SQLException => { println@Console("Error when creating the outbox table for the outbox!")() })
+
+            // Varchar size is not enforced by sqlite, we can insert a string of any length
+            createTableRequest = "CREATE TABLE IF NOT EXISTS outbox (kafkaKey VARCHAR(50), kafkaValue VARCHAR (150), mid SERIAL PRIMARY KEY);"
+            update@Database( createTableRequest )( ret )
         }
 
-        /*
-        *Executes the request.query as well as writing the request.message to the messages table
-        */
+        relayRequest.databaseConnectionInfo << p.databaseConnectionInfo
+        relayRequest.pollSettings << p.pollSettings
+
+        relayRequest.columnSettings.keyColumn = "kafkaKey"
+        relayRequest.columnSettings.valueColumn = "kafkaValue"
+        relayRequest.columnSettings.idColumn = "mid"
+        relayRequest.brokerOptions << p.brokerOptions
+        
+        startReadingMessages@MFS( relayRequest )
+    }
+    
+    main {
         [updateOutbox( req )( res ){
+            install (ConnectionError => {
+                println@Console("Call to update before connecting")();
+                res.message = "Call to update before connecting!";
+                res.success = false
+            })
+
             updateOutboxTable = "INSERT INTO outbox (kafkaKey, kafkaValue) VALUES ('" + req.key + "', '" + req.value + "');" 
 
             with ( updateRequest ){
@@ -83,9 +89,12 @@ service Outbox{
             executeUpdate@TransactionService( updateRequest )( updateResponse )
             if ( req.commitTransaction ){
                 commit@TransactionService( req.tHandle )()
-            }
-            res.success = true 
-            res.message = "Transaction executed sucessfully"
+                res.message = "Transaction executed sucessfully"
+                res.success = true 
+            } else {
+                res.message = "Update could not be executed"
+                res.success = false
+            }'
         }]
     }
 }

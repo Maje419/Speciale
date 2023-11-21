@@ -1,4 +1,4 @@
-include "inboxTypes.iol"
+from .inboxTypes import InitializeConsumerRequest, KafkaOptions, ConsumeRequest, ConsumerRecord, CommitRequest, CommitResponse
 
 interface SimpleKafkaConsumerInterface {
     RequestResponse: 
