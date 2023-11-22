@@ -31,7 +31,6 @@ type InboxEmbeddingConfig: void {
     .transactionServiceLocation: any
     .kafkaPollOptions: PollOptions
     .kafkaInboxOptions: KafkaOptions
-
 }
 
 type MRSEmbeddingConfig: void {
@@ -40,8 +39,23 @@ type MRSEmbeddingConfig: void {
     .kafkaInboxOptions: KafkaOptions
 }
 
-interface InboxInterface {
-    RequestResponse: recieveKafka( KafkaMessage )( string )
+// ------- InboxWriter Types ---------
+type InboxWriterInsertRequest{
+    .operation: string      // The operation to be called
+    .request*: any          // The request which was to be sent to the operation, as a Jolie structure
+    .id*: int               // If the message has an ID to make it imdepodent, place it here. Otherwise, it's assigned NULL in the inbox table
+}
+
+// This interface is used by the MRS to call the InboxWriter when it finds a new message in Kafka
+interface InboxWriterKafkaInterface {               
+    RequestResponse: 
+        recieveKafka( KafkaMessage )( string )
+}
+
+// This interface can be called by the user to insert a new message in the inbox table
+interface InboxWriterExternalInterface {
+    RequestResponse:
+        insert( InboxWriterInsertRequest )( string )
 }
 
 //#################### MessageRetrieverService types #######################
