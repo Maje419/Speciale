@@ -43,7 +43,7 @@ service ServiceB{
 
         getLocalLocation@Runtime()( location )
         loadEmbeddedService@Runtime( { 
-            filepath = "Inbox/inboxServiceB.ol"
+            filepath = "Inbox/inboxWriter.ol"
             params << { 
                 localLocation << location
                 databaseConnectionInfo << config.serviceBConnectionInfo

@@ -4,7 +4,8 @@ from file import File
 from runtime import Runtime
 from json-utils import JsonUtils
 
-from .serviceAInterface import ServiceAInterface
+from .serviceAInterface import ServiceAInterfaceExternal, ServiceAInterfaceLocal
+from .Inbox.inboxWriter import InboxWriterExternalInterface
 from .Outbox.outboxService import OutboxInterface
 from .TransactionService.transactionService import TransactionService
 
@@ -13,11 +14,11 @@ service ServiceA{
 
     // We only need to receive on local, since Inbox will handle external messages
     inputPort ServiceALocal {
-        location: "local" 
+        location: "local"
         protocol: http{
             format = "json"
         }
-        interfaces: ServiceAInterface
+        interfaces: ServiceAInterfaceLocal, ServiceAInterfaceExternal
     }
 
     // We need to be able to send messages to the Outbox Service to tell it what to put in the outbox
@@ -43,20 +44,22 @@ service ServiceA{
                 format = "json"
             }) ( config )
 
-        
-        // Load the inbox service as an embedded service
-        getLocalLocation@Runtime()( location )
-        loadEmbeddedService@Runtime( { 
+        getLocalLocation@Runtime()(location)
+
+        with( inboxConfig )
+        { 
+            .localLocation << location;
+            .externalLocation << "socket://localhost:8080";       //This doesn't work (yet)
+            .databaseConnectionInfo << config.serviceAConnectionInfo;
+            .transactionServiceLocation << TransactionService.location;   // All embedded services must talk to the same instance of 'TransactionServie'
+            .kafkaPollOptions << config.pollOptions;
+            .kafkaInboxOptions << config.kafkaInboxOptions
+        }
+
+        loadEmbeddedService@Runtime({
             filepath = "Inbox/inboxServiceA.ol"
-            params << { 
-                localLocation << location
-                externalLocation << "socket://localhost:8080"       //This doesn't work (yet)
-                databaseConnectionInfo << config.serviceAConnectionInfo
-                transactionServiceLocation << TransactionService.location   // All embedded services must talk to the same instance of 'TransactionServie'
-                kafkaPollOptions << config.pollOptions
-                kafkaInboxOptions << config.kafkaInboxOptions
-            }
-        } )( )
+            params << inboxConfig
+        })()
 
         // Load the outbox service as an embedded service
         loadEmbeddedService@Runtime( {
@@ -76,7 +79,6 @@ service ServiceA{
 
         scope ( createTable )  // Create the table containing the 'state' of service A
         {   
-            install ( SQLException => println@Console("SQLException while creating 'numbers' table in Service A")() )
             
             // Start a transaction, and get the associated transaction handle
             initializeTransaction@TransactionService()( tHandle )
@@ -92,9 +94,6 @@ service ServiceA{
             commit@TransactionService( tHandle )( )
         }
     }
-
-    //TODO: A third service should really be running, looking for updates to the inbox table and
-    //      forwarding these to the 'main' service. This would cause no messages to be skipped
 
     main {
         [ updateNumber( req )( res )

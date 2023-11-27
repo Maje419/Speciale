@@ -1,7 +1,13 @@
 from console import Console
 from time import Time
 
-from .inboxTypes import InboxInterface, MRSEmbeddingConfig
+// Communicate back to the inboxWriter which writes messages to the inbox
+from .inboxWriter import InboxWriterKafkaInterface
+
+// The type of the parameter is located along the other inbox types
+from .inboxTypes import MRSEmbeddingConfig
+
+// We use a Java class which uses the kafka library to connect to Kafka
 from .kafka-retriever import KafkaConsumer
 
 service MessageRetriever(p: MRSEmbeddingConfig) {
@@ -11,7 +17,7 @@ service MessageRetriever(p: MRSEmbeddingConfig) {
         protocol: http{
             format = "json"
         }
-        interfaces: InboxInterface            
+        interfaces: InboxWriterKafkaInterface            
     }
     embed KafkaConsumer as KafkaConsumer
     embed Time as Time
@@ -21,8 +27,6 @@ service MessageRetriever(p: MRSEmbeddingConfig) {
     {
         // Overwrite so we can contact the Inbox Service
         InboxService.location << p.inboxServiceLocation
-
-        println@Console(" poll: " + p.pollOptions.pollDurationMS )(  )
 
         // Initialize the Kafka Consumer
         with ( inboxSettings ){

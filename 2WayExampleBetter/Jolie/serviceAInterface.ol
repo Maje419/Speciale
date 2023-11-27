@@ -11,9 +11,12 @@ type FinalizeChoreographyRequest {
 type UpdateNumberResponse: string
 
 
-interface ServiceAInterface{
+interface ServiceAInterfaceExternal{
     RequestResponse:
         updateNumber( UpdateNumberRequest )( UpdateNumberResponse )
+}
+
+interface ServiceAInterfaceLocal{
     OneWay:
         finalizeChoreography( FinalizeChoreographyRequest )
 }

@@ -31,7 +31,8 @@ interface TransactionServiceOperations {
         initializeTransaction( void )( TransactionHandle ),
         executeQuery( QueryRequest )( QueryResult ),
         executeUpdate( UpdateRequest )( UpdateResponse ),
-        commit( TransactionHandle )( TransactionResult )
+        commit( TransactionHandle )( TransactionResult ),
+        abort ( TransactionHandle ) ( bool )
 }
 
 service TransactionService{

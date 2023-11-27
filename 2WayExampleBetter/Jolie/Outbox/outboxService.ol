@@ -1,6 +1,6 @@
 from .outboxTypes import OutboxSettings, UpdateOutboxRequest, StatusResponse
 from .messageForwarderService import MessageForwarderInterface
-from ..TransactionService.transactionService import TransactionServiceInterface
+from ..TransactionService.transactionService import TransactionServiceOperations
 from runtime import Runtime
 from console import Console
 from database import Database
@@ -25,7 +25,7 @@ service Outbox(p: OutboxSettings){
         Protocol: http{
             format = "json"
         }
-        Interfaces: TransactionServiceInterface
+        Interfaces: TransactionServiceOperations
     }
 
     outputPort MFS {
@@ -49,7 +49,6 @@ service Outbox(p: OutboxSettings){
         })( MFS.location )
 
         println@Console("OutboxService: \tInitializing connection to Kafka")();
-        connect@TransactionService( p.databaseConnectionInfo )( void )
         connect@Database( p.databaseConnectionInfo )( void )
         scope ( createMessagesTable )
         {
