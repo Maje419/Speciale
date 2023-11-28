@@ -73,7 +73,6 @@ public class TransactionService extends JavaService {
     // e.g. First 'con' is retrieved by thread A(commit), then 'con' is aborted by
     // thread B(abort), and then 'con' is comitted by A.
     private Object m_commitAbortLock = new Object();
-    private Object m_connectionLock = new Object();
 
     /**
      * Sets or overwrites the current connection string, meaning which database any
@@ -83,92 +82,94 @@ public class TransactionService extends JavaService {
      * @throws FaultException
      */
     public Value connect(Value request) throws FaultException {
-        synchronized (m_connectionLock) {
-            System.out.println("Transactionservice: Connecting");
-            Value response = Value.create();
+        System.out.println("Transactionservice: Connecting");
+        Value response = Value.create();
 
-            // If connectionString is set, this service is already connected to a database
-            if (m_connectionString != null) {
-                response.setValue("Connected to TransactionService");
-            } else {
+        // If connectionString is set, this service is already connected to a database
+        if (m_connectionString != null) {
+            response.setValue("Connected to TransactionService");
+        } else {
 
-                // Retrieve all the information stored in the request parameter
-                m_driver = request.getChildren("driver").first().strValue();
-                if (request.getFirstChild("driver").hasChildren("class")) {
-                    m_driverClass = request.getFirstChild("driver").getFirstChild("class").strValue();
-                }
-                String host = request.getChildren("host").first().strValue();
-                String port = request.getChildren("port").first().strValue();
-                String databaseName = request.getChildren("database").first().strValue();
-                m_username = request.getChildren("username").first().strValue();
-                m_password = request.getChildren("password").first().strValue();
-                String attributes = request.getFirstChild("attributes").strValue();
-                String separator = File.separator;
-                Optional<String> encoding = Optional
-                        .ofNullable(
-                                request.hasChildren("encoding") ? request.getFirstChild("encoding").strValue() : null);
-
-                // Load the corrrect driver if it is defined
-                try {
-                    if (m_driverClass != null) {
-                        System.out.println("Loading driver: " + m_driver);
-                        Class.forName(m_driverClass);
-                    }
-
-                    // Construct the connectionString
-                    if (m_driver.equals("sqlite")) {
-                        m_connectionString = "jdbc:" + m_driver + ":" + databaseName;
-                        if (!attributes.isEmpty()) {
-                            m_connectionString += ";" + attributes;
-                        }
-                    } else // m_driver is postgresql
-                    {
-                        m_connectionString = "jdbc:" + m_driver + "://" + host + (port.isEmpty() ? "" : ":" + port)
-                                + separator + databaseName;
-                        if (encoding.isPresent()) {
-                            m_connectionString += "?characterEncoding=" + encoding.get();
-                        }
-                    }
-                    response.setValue("Connected to TransactionService");
-                } catch (ClassNotFoundException e) {
-                    // Thrown if trying to load a driver which is not in the classpath
-                    throw new FaultException("DriverClassNotFound", e);
-                }
+            // Retrieve all the information stored in the request parameter
+            m_driver = request.getChildren("driver").first().strValue();
+            if (request.getFirstChild("driver").hasChildren("class")) {
+                m_driverClass = request.getFirstChild("driver").getFirstChild("class").strValue();
             }
-            System.out.println("Transactionservice: Connected");
-            return response;
+            String host = request.getChildren("host").first().strValue();
+            String port = request.getChildren("port").first().strValue();
+            String databaseName = request.getChildren("database").first().strValue();
+            m_username = request.getChildren("username").first().strValue();
+            m_password = request.getChildren("password").first().strValue();
+            String attributes = request.getFirstChild("attributes").strValue();
+            String separator = File.separator;
+            Optional<String> encoding = Optional
+                    .ofNullable(
+                            request.hasChildren("encoding") ? request.getFirstChild("encoding").strValue() : null);
+
+            // Load the corrrect driver if it is defined
+            try {
+                if (m_driverClass != null) {
+                    System.out.println("Loading driver: " + m_driver);
+                    Class.forName(m_driverClass);
+                } else {
+                    switch (m_driver) {
+                        case "postgresql":
+                            Class.forName("org.postgresql.Driver");
+                            break;
+                        case "sqlite":
+                            Class.forName("org.sqlite.JDBC");
+                            break;
+                        default:
+                            throw new FaultException("InvalidDriver", "Unknown type of driver: " + m_driver);
+                    }
+                }
+
+                // Construct the connectionString
+                if (m_driver.equals("sqlite")) {
+                    m_connectionString = "jdbc:" + m_driver + ":" + databaseName;
+                    if (!attributes.isEmpty()) {
+                        m_connectionString += ";" + attributes;
+                    }
+                } else // m_driver is postgresql
+                {
+                    m_connectionString = "jdbc:" + m_driver + "://" + host + (port.isEmpty() ? "" : ":" + port)
+                            + separator + databaseName;
+                    if (encoding.isPresent()) {
+                        m_connectionString += "?characterEncoding=" + encoding.get();
+                    }
+                }
+                response.setValue("Connected to TransactionService");
+            } catch (ClassNotFoundException e) {
+                // Thrown if trying to load a driver which is not in the classpath
+                throw new FaultException("DriverClassNotFound", e);
+            }
         }
+        System.out.println("Transactionservice: Connected");
+        return response;
     }
 
     public Value initializeTransaction() throws FaultException {
+        System.out.println("Transactionservice: initializing new transaction");
+        Value response = Value.create();
+        Connection con;
         try {
-            Thread.sleep(1000);
-        } catch (InterruptedException e) {
+            // Create a new connection, and map it to a generated UUID.
+            con = DriverManager.getConnection(
+                    m_connectionString,
+                    m_username,
+                    m_password);
+            con.setAutoCommit(false); // This line is where the magic happens
+            String uuid = UUID.randomUUID().toString();
+
+            // Store the open transactions in a map. uuid is used as a handle.
+            m_openTransactions.put(uuid, con);
+
+            response.setValue(uuid);
+            System.out.println("Transactionservice: New transaction initialized");
+            return response;
+        } catch (SQLException e) {
             e.printStackTrace();
-        }
-        synchronized (m_connectionLock) {
-            System.out.println("Transactionservice: initializing new transaction");
-            Value response = Value.create();
-            Connection con;
-            try {
-                // Create a new connection, and map it to a generated UUID.
-                con = DriverManager.getConnection(
-                        m_connectionString,
-                        m_username,
-                        m_password);
-                con.setAutoCommit(false); // This line is where the magic happens
-                String uuid = UUID.randomUUID().toString();
-
-                // Store the open transactions in a map. uuid is used as a handle.
-                m_openTransactions.put(uuid, con);
-
-                response.setValue(uuid);
-                System.out.println("Transactionservice: New transaction initialized");
-                return response;
-            } catch (SQLException e) {
-                e.printStackTrace();
-                throw new FaultException("SQLException", "Error while starting transaction.");
-            }
+            throw new FaultException("SQLException", "Error while starting transaction.");
         }
     }
 

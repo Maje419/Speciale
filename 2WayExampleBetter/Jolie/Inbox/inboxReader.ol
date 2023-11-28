@@ -77,6 +77,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                     abort@TransactionService( tHandle )( aborted )
                     if ( !aborted )
                     {
+                        // TODO: Handle this exception, which happens if the transaction is committed before this abort reaches TS
                         throw ( TransactionClosedFault )
                     }
                 }
