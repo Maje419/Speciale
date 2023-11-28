@@ -33,7 +33,7 @@ type InboxEmbeddingConfig: void {
     .kafkaInboxOptions: KafkaOptions
 }
 
-type MRSEmbeddingConfig: void {
+type MRSEmbeddingConfig {
     .inboxServiceLocation: any
     .kafkaPollOptions: PollOptions
     .kafkaInboxOptions: KafkaOptions
@@ -41,9 +41,9 @@ type MRSEmbeddingConfig: void {
 
 // ------- InboxWriter Types ---------
 type InboxWriterInsertRequest{
-    .operation: string      // The operation to be called
+    .operation: string          // The operation to be called
     .request*: any {?}          // The request which was to be sent to the operation, as a Jolie structure
-    .id*: int               // If the message has an ID to make it imdepodent, place it here. Otherwise, it's assigned NULL in the inbox table
+    .id*: int                   // If the message has an ID to make it imdepodent, place it here. Otherwise, it's assigned NULL in the inbox table
 }
 
 //#################### MessageRetrieverService types #######################

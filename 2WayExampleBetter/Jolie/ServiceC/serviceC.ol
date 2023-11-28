@@ -4,19 +4,19 @@ from file import File
 from runtime import Runtime
 from json-utils import JsonUtils
 
-from .serviceBInterface import ServiceBInterface
+from .serviceCInterface import ServiceCInterface
 from ..Outbox.outboxService import OutboxInterface
 from ..TransactionService.transactionService import TransactionService
 
-service ServiceB{
+service ServiceC{
     execution: concurrent
 
-    inputPort ServiceBLocal {
+    inputPort ServiceCLocal {
         location: "local" 
         protocol: http{
             format = "json"
         }
-        interfaces: ServiceBInterface
+        interfaces: ServiceCInterface
     }
 
     outputPort OutboxService {
@@ -34,10 +34,10 @@ service ServiceB{
     embed Runtime as Runtime
     embed TransactionService as TransactionService
 
-    init {
+    init{
         readFile@File(
             {
-                filename = "ServiceB/serviceBConfig.json"
+                filename = "ServiceC/serviceCConfig.json"
                 format = "json"
             }) ( config )
 
@@ -46,7 +46,7 @@ service ServiceB{
         { 
             .localLocation << location;
             .externalLocation << "socket://localhost:8080";       //This doesn't work (yet)
-            .databaseConnectionInfo << config.serviceBConnectionInfo;
+            .databaseConnectionInfo << config.serviceCConnectionInfo;
             .transactionServiceLocation << TransactionService.location;   // All embedded services must talk to the same instance of 'TransactionServie'
             .kafkaPollOptions << config.pollOptions;
             .kafkaInboxOptions << config.kafkaInboxOptions
@@ -67,15 +67,14 @@ service ServiceB{
             filepath = "Outbox/outboxService.ol"
             params << { 
                 pollSettings << config.pollOptions;
-                databaseConnectionInfo << config.serviceBConnectionInfo;
+                databaseConnectionInfo << config.serviceCConnectionInfo;
                 brokerOptions << config.kafkaOutboxOptions;
                 transactionServiceLocation << TransactionService.location
             }
-        } )( OutboxService.location )    // It is very important that this is a lower-case 'location', otherwise it doesn't work
-                                        // Guess how long it took me to figure that out :)
+        } )( OutboxService.location )    
 
-        connect@TransactionService(config.serviceBConnectionInfo)()
-        connect@Database( config.serviceBConnectionInfo )( )
+        connect@TransactionService(config.serviceCConnectionInfo)()
+        connect@Database( config.serviceCConnectionInfo )( )
 
         scope ( createtable ) 
         {
@@ -84,10 +83,10 @@ service ServiceB{
         }
     }
 
-    main 
+    main
     {
-        [numbersUpdated( req )]
-        {   
+        [updateNumbers( req )( res ){
+            // Once a request is recieved, we update our own local state for that person
             with ( userExistsQuery ){
                 .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "'";
                 .handle = req.handle
@@ -103,24 +102,27 @@ service ServiceB{
             {
                 localUpdate.update = "UPDATE Numbers SET number = number + 1 WHERE username = '" + req.username + "'"
             }
-
+            
             localUpdate.handle = req.handle
-
             executeUpdate@TransactionService( localUpdate )()
 
-            with ( updateServiceCRequest ){
+            // Send to our outbox that we've completed our update
+            with ( finalizeServiceARequest ){
                 .username = req.username
             }
+
             with ( outboxQuery ){
                     .tHandle = req.handle;
                     .commitTransaction = true;
                     .topic = config.kafkaOutboxOptions.topic;
-                    .operation = "updateNumbers"
+                    .operation = "finalizeChoreography"
             }
-            getJsonString@JsonUtils( updateServiceCRequest )( outboxQuery.data )
+            getJsonString@JsonUtils( finalizeServiceARequest )( outboxQuery.data )
 
             updateOutbox@OutboxService( outboxQuery )( updateResponse )
-            println@Console("Service B has updated locally")()
-        }
+            
+            res = true
+            println@Console("Service C has updated locally")()
+        }]
     }
 }

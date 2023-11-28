@@ -7,6 +7,7 @@ from console import Console
 from .inboxTypes import InboxEmbeddingConfig
 from ..ServiceA.serviceAInterface import ServiceAInterfaceExternal, ServiceAInterfaceLocal
 from ..ServiceB.serviceBInterface import ServiceBInterface
+from ..ServiceC.serviceCInterface import ServiceCInterface
 from ..TransactionService.transactionService import TransactionServiceOperations
 
 service InboxReaderService (p: InboxEmbeddingConfig){
@@ -24,7 +25,8 @@ service InboxReaderService (p: InboxEmbeddingConfig){
         Interfaces: 
             ServiceAInterfaceExternal, 
             ServiceAInterfaceLocal,
-            ServiceBInterface
+            ServiceBInterface,
+            ServiceCInterface
     }
 
     outputPort TransactionService 
@@ -122,7 +124,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                 {
                     // If some message in the database matches the message in this open transaction,
                     // clearly the trnasaction is not closed yet.
-                    if ( row.kafkaId + ":" + row.messageId == transaction )
+                    if ( row.kafkaid + ":" + row.messageid == transaction )
                     {
                         transactionIsClosed = false
                     }
