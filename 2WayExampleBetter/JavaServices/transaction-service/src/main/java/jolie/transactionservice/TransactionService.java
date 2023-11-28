@@ -67,6 +67,14 @@ public class TransactionService extends JavaService {
     private String m_driver = null;
     private String m_driverClass = null;
 
+    // This lock ensures ensures that we never end in the situation where two
+    // threads manipulate the same connection
+    // in such a way that the same transaction is first aborted, then committed.
+    // e.g. First 'con' is retrieved by thread A(commit), then 'con' is aborted by
+    // thread B(abort), and then 'con' is comitted by A.
+    private Object m_commitAbortLock = new Object();
+    private Object m_connectionLock = new Object();
+
     /**
      * Sets or overwrites the current connection string, meaning which database any
      * writes are made to.
@@ -75,81 +83,97 @@ public class TransactionService extends JavaService {
      * @throws FaultException
      */
     public Value connect(Value request) throws FaultException {
-        Value response = Value.create();
+        synchronized (m_connectionLock) {
+            System.out.println("Transactionservice: Connecting");
+            Value response = Value.create();
 
-        // If connectionString is set, this service is already connected to a database
-        if (m_connectionString != null) {
-            response.setValue("Connected to TransactionService");
-        } else {
-
-            // Retrieve all the information stored in the request parameter
-            m_driver = request.getChildren("driver").first().strValue();
-            if (request.getFirstChild("driver").hasChildren("class")) {
-                m_driverClass = request.getFirstChild("driver").getFirstChild("class").strValue();
-            }
-            String host = request.getChildren("host").first().strValue();
-            String port = request.getChildren("port").first().strValue();
-            String databaseName = request.getChildren("database").first().strValue();
-            m_username = request.getChildren("username").first().strValue();
-            m_password = request.getChildren("password").first().strValue();
-            String attributes = request.getFirstChild("attributes").strValue();
-            String separator = File.separator;
-            Optional<String> encoding = Optional
-                    .ofNullable(
-                            request.hasChildren("encoding") ? request.getFirstChild("encoding").strValue() : null);
-
-            // Load the corrrect driver if it is defined
-            try {
-                if (m_driverClass != null) {
-                    Class.forName(m_driverClass);
-                }
-
-                // Construct the connectionString
-                if (m_driver.equals("sqlite")) {
-                    m_connectionString = "jdbc:" + m_driver + ":" + databaseName;
-                    if (!attributes.isEmpty()) {
-                        m_connectionString += ";" + attributes;
-                    }
-                } else // Driver is postgres
-                {
-                    m_connectionString = "jdbc:" + m_driver + "://" + host + (port.isEmpty() ? "" : ":" + port)
-                            + separator + databaseName;
-                    if (encoding.isPresent()) {
-                        m_connectionString += "?characterEncoding=" + encoding.get();
-                    }
-                }
+            // If connectionString is set, this service is already connected to a database
+            if (m_connectionString != null) {
                 response.setValue("Connected to TransactionService");
-            } catch (ClassNotFoundException e) {
-                // Thrown if trying to load a driver which is not in the classpath
-                throw new FaultException("DriverClassNotFound", e);
+            } else {
+
+                // Retrieve all the information stored in the request parameter
+                m_driver = request.getChildren("driver").first().strValue();
+                if (request.getFirstChild("driver").hasChildren("class")) {
+                    m_driverClass = request.getFirstChild("driver").getFirstChild("class").strValue();
+                }
+                String host = request.getChildren("host").first().strValue();
+                String port = request.getChildren("port").first().strValue();
+                String databaseName = request.getChildren("database").first().strValue();
+                m_username = request.getChildren("username").first().strValue();
+                m_password = request.getChildren("password").first().strValue();
+                String attributes = request.getFirstChild("attributes").strValue();
+                String separator = File.separator;
+                Optional<String> encoding = Optional
+                        .ofNullable(
+                                request.hasChildren("encoding") ? request.getFirstChild("encoding").strValue() : null);
+
+                // Load the corrrect driver if it is defined
+                try {
+                    if (m_driverClass != null) {
+                        System.out.println("Loading driver: " + m_driver);
+                        Class.forName(m_driverClass);
+                    }
+
+                    // Construct the connectionString
+                    if (m_driver.equals("sqlite")) {
+                        m_connectionString = "jdbc:" + m_driver + ":" + databaseName;
+                        if (!attributes.isEmpty()) {
+                            m_connectionString += ";" + attributes;
+                        }
+                    } else // m_driver is postgresql
+                    {
+                        m_connectionString = "jdbc:" + m_driver + "://" + host + (port.isEmpty() ? "" : ":" + port)
+                                + separator + databaseName;
+                        if (encoding.isPresent()) {
+                            m_connectionString += "?characterEncoding=" + encoding.get();
+                        }
+                    }
+                    response.setValue("Connected to TransactionService");
+                } catch (ClassNotFoundException e) {
+                    // Thrown if trying to load a driver which is not in the classpath
+                    throw new FaultException("DriverClassNotFound", e);
+                }
             }
+            System.out.println("Transactionservice: Connected");
+            return response;
         }
-        return response;
     }
 
     public Value initializeTransaction() throws FaultException {
-        Value response = Value.create();
-        Connection con;
         try {
-            // Create a new connection, and map it to a generated UUID.
-            con = DriverManager.getConnection(
-                    m_connectionString,
-                    m_username,
-                    m_password);
-            con.setAutoCommit(false); // This line is where the magic happens
-            String uuid = UUID.randomUUID().toString();
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        synchronized (m_connectionLock) {
+            System.out.println("Transactionservice: initializing new transaction");
+            Value response = Value.create();
+            Connection con;
+            try {
+                // Create a new connection, and map it to a generated UUID.
+                con = DriverManager.getConnection(
+                        m_connectionString,
+                        m_username,
+                        m_password);
+                con.setAutoCommit(false); // This line is where the magic happens
+                String uuid = UUID.randomUUID().toString();
 
-            // Store the open transactions in a map. uuid is used as a handle.
-            m_openTransactions.put(uuid, con);
+                // Store the open transactions in a map. uuid is used as a handle.
+                m_openTransactions.put(uuid, con);
 
-            response.setValue(uuid);
-            return response;
-        } catch (SQLException e) {
-            throw new FaultException("SQLException", "Error while starting transaction.");
+                response.setValue(uuid);
+                System.out.println("Transactionservice: New transaction initialized");
+                return response;
+            } catch (SQLException e) {
+                e.printStackTrace();
+                throw new FaultException("SQLException", "Error while starting transaction.");
+            }
         }
     }
 
     public Value executeQuery(Value input) throws FaultException {
+        System.out.println("Transactionservice: Executing query");
         String transactionHandle = input.getFirstChild("handle").strValue();
         String query = input.getFirstChild("query").strValue();
 
@@ -169,6 +193,7 @@ public class TransactionService extends JavaService {
 
             // Load the result of the query into the response Jolie variable.
             resultSetToValueVector(result, response.getChildren("row"));
+            System.out.println("Transactionservice: Executed query");
             return response;
         } catch (SQLException e) {
             throw new FaultException("SQLException", e);
@@ -176,7 +201,7 @@ public class TransactionService extends JavaService {
     }
 
     public Value executeUpdate(Value input) throws FaultException {
-        System.out.println("01");
+        System.out.println("Transactionservice: Executing update");
         String transactionHandle = input.getFirstChild("handle").strValue();
         String query = input.getFirstChild("update").strValue();
 
@@ -184,43 +209,68 @@ public class TransactionService extends JavaService {
         try {
             // Execute an update on an open connection.
             Connection con = m_openTransactions.get(transactionHandle);
-            System.out.println("02");
 
             if (con == null) {
                 throw new FaultException("ConnectionClosed",
                         "No connection with transaction handle " + transactionHandle + " is open.");
             }
-            System.out.println("03");
 
             PreparedStatement statement = con.prepareStatement(query);
             int numberRowsUpdated = statement.executeUpdate();
-            System.out.println("04");
             // Return the number of rows affected by the update
             response.setValue(numberRowsUpdated);
+            System.out.println("Transactionservice: Executed update");
             return response;
         } catch (SQLException e) {
+            System.out.println("Query: '" + query + "' failed");
             throw new FaultException("SQLException", e);
         }
     }
 
     public Value commit(String transactionHandle) throws FaultException {
+        System.out.println("Transactionservice: Committing transaction");
         Value response = Value.create();
 
         try {
-            Connection con = m_openTransactions.get(transactionHandle);
+            synchronized (m_commitAbortLock) {
+                Connection con = m_openTransactions.get(transactionHandle);
 
-            if (con == null) {
-                throw new FaultException("ConnectionClosed",
-                        "No connection with transaction handle " + transactionHandle + " is open.");
+                if (con == null) {
+                    throw new FaultException("ConnectionClosed",
+                            "No connection with transaction handle " + transactionHandle + " is open.");
+                }
+
+                // Commit the transaction, then remove it from the open transactions
+                con.commit();
+                m_openTransactions.remove(transactionHandle);
+
+                response.setValue("Transaction " + transactionHandle + " was commited sucessfully.");
+                System.out.println("Transactionservice: Committed transaction");
+                return response;
             }
+        } catch (SQLException e) {
+            throw new FaultException("SQLException", e);
+        }
+    }
 
-            // Commit the transaction, then remove it from the open transactions
-            con.commit();
-            m_openTransactions.remove(transactionHandle);
+    public boolean abort(String transactionHandle) throws FaultException {
+        try {
+            System.out.println("Transactionservice: Aborting transaction");
+            Connection con;
+            synchronized (m_commitAbortLock) {
+                con = m_openTransactions.get(transactionHandle);
 
-            response.setValue("Transaction " + transactionHandle + " was commited sucessfully.");
-            return response;
+                if (con == null) {
+                    throw new FaultException("ConnectionClosed",
+                            "No connection with transaction handle " + transactionHandle + " is open.");
+                }
 
+                con.rollback();
+                con.close();
+                m_openTransactions.remove(transactionHandle);
+                System.out.println("Transactionservice: Transaction aborted");
+                return con.isClosed();
+            }
         } catch (SQLException e) {
             throw new FaultException("SQLException", e);
         }

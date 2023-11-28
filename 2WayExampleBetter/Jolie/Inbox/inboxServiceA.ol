@@ -21,10 +21,7 @@ service InboxServiceA (p: InboxEmbeddingConfig){
     embed Runtime as Runtime
     embed InboxWriterService(p) as InboxWriter
     embed InboxReaderService(p) as InboxReader
-
-    init{
-        println@Console("!23")()
-    }
+    
     main
     {
         [ updateNumber( req )( res )

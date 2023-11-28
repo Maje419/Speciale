@@ -42,15 +42,25 @@ service ServiceB{
             }) ( config )
 
         getLocalLocation@Runtime()( location )
+
+        with( inboxConfig )
+        { 
+            .localLocation << location;
+            .externalLocation << "socket://localhost:8080";       //This doesn't work (yet)
+            .databaseConnectionInfo << config.serviceAConnectionInfo;
+            .transactionServiceLocation << TransactionService.location;   // All embedded services must talk to the same instance of 'TransactionServie'
+            .kafkaPollOptions << config.pollOptions;
+            .kafkaInboxOptions << config.kafkaInboxOptions
+        }
+
         loadEmbeddedService@Runtime( { 
             filepath = "Inbox/inboxWriter.ol"
-            params << { 
-                localLocation << location
-                databaseConnectionInfo << config.serviceBConnectionInfo
-                transactionServiceLocation << TransactionService.location   // All embedded services must talk to the same instance of 'TransactionServie'
-                kafkaPollOptions << config.pollOptions
-                kafkaInboxOptions << config.kafkaInboxOptions
-            }
+            params << inboxConfig
+        } )( )
+
+        loadEmbeddedService@Runtime( { 
+            filepath = "Inbox/inboxReader.ol"
+            params << inboxConfig
         } )( )
 
         // Load the outbox service as an embedded service

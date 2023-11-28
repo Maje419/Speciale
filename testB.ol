@@ -4,8 +4,9 @@ include "console.iol"
 from .testA import ServiceAInterface
 from runtime import Runtime
 
-type UR: void {
-    .sid: string
+type UR {
+    .name: string
+    .number: int
 }
 
 interface ServiceBInterface {
@@ -37,24 +38,11 @@ service ServiceB(p: ServiceBProperties){
 
     init {
         ServiceA.location = p.serviceALocation
-
-        with ( connectionInfo )
-        {
-            .username = "";
-            .password = "";
-            .host = "";
-            .database = "file:test.sqlite"; // "." for memory-only
-            .driver = "sqlite"
-        }
-
-        connect@Database(connectionInfo)(res)
     }
 
     main {
         [update( req ) ( res ){
-            println@Console( "Hello from Service B" )(  )
-            interruptRequest.sid << req.sid 
-            interrupt@ServiceA( interruptRequest )( res )
+            println@Console( "Hello from Service B with name: " + req.name + " and number: " + req.number )(  )
             res = "Nice"
         }]
     }

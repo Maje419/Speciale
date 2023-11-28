@@ -2,6 +2,7 @@ include "database.iol"
 include "console.iol"
 
 from runtime import Runtime
+from reflection import Reflection
 from .testB import ServiceB
 from .testB import ServiceBInterface
 
@@ -9,14 +10,11 @@ type NameRequest {
     .name: string
 }
 
-type InterruptRequest {
-    .sid: string
-}
 
 interface ServiceAInterface {
     RequestResponse: 
         initiateChoreography( NameRequest ) ( string ),
-        interrupt( InterruptRequest ) ( string )
+        finishChoreography( string )( string )
 }
 
 service ServiceA{
@@ -45,6 +43,7 @@ service ServiceA{
         interfaces: ServiceBInterface
     }
     embed Runtime as Runtime
+    embed Reflection as Reflection
 
     init {
         getLocalLocation@Runtime(  )( localLocation )   
@@ -54,36 +53,23 @@ service ServiceA{
                 serviceALocation << localLocation
             }
         })( ServiceB.location )
-        
-        with ( connectionInfo )
-        {
-            .username = "";
-            .password = "";
-            .host = "";
-            .database = "file:test.sqlite"; // "." for memory-only
-            .driver = "sqlite"
-        }
-
-        connect@Database(connectionInfo)(res)
-        update@Database( "CREATE TABLE IF NOT EXISTS testtable(name VARCHAR(50))")(  )
-    }
-
-    cset {
-        token: InterruptRequest.sid
     }
 
     main{
         [initiateChoreography( req )( res ){
             println@Console( "Hello from Service A" )(  )
-            updateRequest.sid = csets.token = new
-            update@ServiceB( updateRequest )( resp )
-            res = "Updated database"
-        }] {
-            println@Console( "Choreography finished" )(  )
-        }
+            with ( invokeRequest ){
+                .outputPort = "ServiceB";
+                .data << {.name = req.name; .number = 12};
+                .operation = "update"
+            }
+            invoke@Reflection( invokeRequest )( resp )
+            // update@ServiceB( req.name )( resp )
+            res = "Updated"
+        }] 
 
-        [interrupt( req )( res ){
-            println@Console( "Service A has been interrupted!" )(  )
+        [finishChoreography( req )( res ){
+            println@Console( "Choreography has been finished with request: " + req )(  )
             res = "Nice"
         }]
     }
