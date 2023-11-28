@@ -2,13 +2,17 @@ from database import Database
 from json-utils import JsonUtils
 from reflection import Reflection
 from time import Time
+from console import Console
 
 from .inboxTypes import InboxEmbeddingConfig
+from ..ServiceA.serviceAInterface import ServiceAInterfaceExternal, ServiceAInterfaceLocal
+from ..ServiceB.serviceBInterface import ServiceBInterface
 from ..TransactionService.transactionService import TransactionServiceOperations
 
 service InboxReaderService (p: InboxEmbeddingConfig){
     execution: single
 
+    embed Console as Console
     embed Database as Database
     embed JsonUtils as JsonUtils
     embed Reflection as Reflection
@@ -17,6 +21,10 @@ service InboxReaderService (p: InboxEmbeddingConfig){
     outputPort Embedder 
     {
         Location: "local"   // Overwritten in init
+        Interfaces: 
+            ServiceAInterfaceExternal, 
+            ServiceAInterfaceLocal,
+            ServiceBInterface
     }
 
     outputPort TransactionService 
@@ -33,7 +41,16 @@ service InboxReaderService (p: InboxEmbeddingConfig){
         // This service will forward calls to its embedder service from the inbox
         Embedder.location << p.localLocation
         TransactionService.location << p.transactionServiceLocation
-        connect@Database(p.databaseConnectionInfo)()
+        connect@Database( p.databaseConnectionInfo )()
+        scope ( AwaitInboxTableCreation ){
+            tableCreated = false;
+            while (!tableCreated){
+                install( SQLException => sleep@Time( 1000 )() )
+                query@Database("SELECT * from inbox;")()
+                tableCreated = true
+            }
+        }
+        println@Console("InboxReader initialized")()
     }
 
     main
@@ -41,22 +58,22 @@ service InboxReaderService (p: InboxEmbeddingConfig){
         while (true)
         {
             query@Database("SELECT * FROM inbox;")( queryResponse );
-            for ( row in queryResponse.rows )
+            for ( row in queryResponse.row )
             {
                 install ( TransactionClosedFault  => 
                     {
                         // This exception is thrown if the query above includes a message whose transaction is
                         // closed before we manage to abort it.
                         // In this case, we don't want to reopen a transaction for said message.
-                        s = 12  // TODO: This is a temp assignment
+                        s = 12  // TODO: This is just to have something here
                     } )
                 
                 // If we already have an open transaction for some inbox message,
                 // it might have been lost or some service might have crashed before commiting.
                 // We will abort the transaction and attempt again.
-                if (is_defined(global.openTransactions.(row.kafkaId + ":" + row.messageId)))
+                if (is_defined(global.openTransactions.(row.kafkaid + ":" + row.messageid)))
                 {
-                    tHandle = global.openTransactions.(row.kafkaId + ":" + row.messageId)
+                    tHandle = global.openTransactions.(row.kafkaid + ":" + row.messageid)
                     abort@TransactionService( tHandle )( aborted )
                     if ( !aborted )
                     {
@@ -66,22 +83,22 @@ service InboxReaderService (p: InboxEmbeddingConfig){
 
                 // Initialize a new transaction to pass onto Service A
                 initializeTransaction@TransactionService()(tHandle)
-                global.openTransactions.(row.kafkaId + ":" + row.messageId) = tHandle;
+                global.openTransactions.(row.kafkaid + ":" + row.messageid) = tHandle;
 
                 // Within this new transaction, update the current message as read
                 with( updateRequest )
                 {
                     .handle = tHandle;
                     .update = "DELETE FROM inbox WHERE " + 
-                            "kafakaId = " + row.kafakaId + 
-                            " AND messageId = " + row.messageId + ";"
+                            "kafkaId = " + row.kafkaid + 
+                            " AND messageId = " + row.messageid + ";"
                 }
 
                 executeUpdate@TransactionService( updateRequest )()
                 
                 // The operation request is stored in the "parameters" column
                 getJsonValue@JsonUtils( row.parameters )( parameters )
-                finalizeRequest.handle = tHandle
+                parameters.handle = tHandle
 
                 // Call the corresponding operation at the embedder service
                 with( embedderInvokationRequest )

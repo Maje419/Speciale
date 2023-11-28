@@ -1,10 +1,10 @@
 from runtime import Runtime
 from console import Console
 
-from .inboxTypes import InboxEmbeddingConfig
-from .inboxWriter import InboxWriterService
-from .inboxReader import InboxReaderService
-from ..serviceAInterface import ServiceAInterfaceExternal
+from ..Inbox.inboxTypes import InboxEmbeddingConfig
+from ..Inbox.inboxWriter import InboxWriterService
+from ..Inbox.inboxReader import InboxReaderService
+from .serviceAInterface import ServiceAInterfaceExternal
 
 service InboxServiceA (p: InboxEmbeddingConfig){
     execution: concurrent
