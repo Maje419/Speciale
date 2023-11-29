@@ -1,11 +1,11 @@
 type UpdateNumberRequest {
-    .username : string
-    .handle[0, 1] : string
+    .username: string
+    .handle: string
 }
 
 type FinalizeChoreographyRequest {
     .username: string
-    .handle[0,1]: string
+    .handle: string
 }
 
 type UpdateNumberResponse: string

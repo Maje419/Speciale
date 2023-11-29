@@ -33,10 +33,8 @@ type InboxEmbeddingConfig: void {
     .kafkaInboxOptions: KafkaOptions
 }
 
-type MRSEmbeddingConfig {
-    .inboxServiceLocation: any
-    .kafkaPollOptions: PollOptions
-    .kafkaInboxOptions: KafkaOptions
+type EmbedderServiceHandle {
+    .handle: string
 }
 
 // ------- InboxWriter Types ---------
@@ -47,6 +45,12 @@ type InboxWriterInsertRequest{
 }
 
 //#################### MessageRetrieverService types #######################
+type MRSEmbeddingConfig {
+    .inboxServiceLocation: any
+    .kafkaPollOptions: PollOptions
+    .kafkaInboxOptions: KafkaOptions
+}
+
 type ConsumeRequest{
     .timeoutMs: long
 }

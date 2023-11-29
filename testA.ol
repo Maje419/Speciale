@@ -60,7 +60,7 @@ service ServiceA{
             with ( invokeRequest ){
                 .outputPort = "ServiceB";
                 .data << {.name = req.username; .number = 12};
-                .operation = "update"
+                .operation = "123"
             }
             invokeRRUnsafe@Reflection( invokeRequest )( resp )
             // update@ServiceB( req.name )( resp )
