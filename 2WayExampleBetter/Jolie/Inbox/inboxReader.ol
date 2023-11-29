@@ -7,7 +7,6 @@ from console import Console
 from .inboxTypes import InboxEmbeddingConfig
 from ..ServiceA.serviceAInterface import ServiceAInterfaceExternal, ServiceAInterfaceLocal
 from ..ServiceB.serviceBInterface import ServiceBInterface
-from ..ServiceC.serviceCInterface import ServiceCInterface
 from ..TransactionService.transactionService import TransactionServiceOperations
 
 service InboxReaderService (p: InboxEmbeddingConfig){
@@ -25,8 +24,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
         Interfaces: 
             ServiceAInterfaceExternal, 
             ServiceAInterfaceLocal,
-            ServiceBInterface,
-            ServiceCInterface
+            ServiceBInterface
     }
 
     outputPort TransactionService 

@@ -7,7 +7,7 @@ from .testB import ServiceB
 from .testB import ServiceBInterface
 
 type NameRequest {
-    .name: string
+    .username: string
 }
 
 
@@ -40,7 +40,6 @@ service ServiceA{
         protocol: http{
             format = "json"
         }
-        interfaces: ServiceBInterface
     }
     embed Runtime as Runtime
     embed Reflection as Reflection
@@ -60,10 +59,10 @@ service ServiceA{
             println@Console( "Hello from Service A" )(  )
             with ( invokeRequest ){
                 .outputPort = "ServiceB";
-                .data << {.name = req.name; .number = 12};
+                .data << {.name = req.username; .number = 12};
                 .operation = "update"
             }
-            invoke@Reflection( invokeRequest )( resp )
+            invokeRRUnsafe@Reflection( invokeRequest )( resp )
             // update@ServiceB( req.name )( resp )
             res = "Updated"
         }] 

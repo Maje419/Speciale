@@ -13,7 +13,7 @@
   "kafkaInboxOptions": {
     "bootstrapServer": "localhost:29092",
     "groupId": "service-a-inbox",
-    "topic": "c-out"
+    "topic": "b-out"
   },
   "kafkaOutboxOptions": {
     "bootstrapServer": "localhost:29092",

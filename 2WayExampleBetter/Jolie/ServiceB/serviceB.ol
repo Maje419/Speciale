@@ -115,7 +115,7 @@ service ServiceB{
                     .tHandle = req.handle;
                     .commitTransaction = true;
                     .topic = config.kafkaOutboxOptions.topic;
-                    .operation = "updateNumbers"
+                    .operation = "finalizeChoreography"
             }
             getJsonString@JsonUtils( updateServiceCRequest )( outboxQuery.data )
 
