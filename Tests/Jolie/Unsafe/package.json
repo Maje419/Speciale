@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@jolie/jot": "^0.0.25"
+  },
+  "scripts": {
+    "test": "jot jot.json"
+  }
+}
