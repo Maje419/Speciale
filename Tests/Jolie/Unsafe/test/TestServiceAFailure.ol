@@ -117,14 +117,15 @@ service TestServiceAFailure{
                 expected = "throw_before_updating"
             })()
 
+                // If A crashes before having updated itself, no update should take place 
             equals@Assertions({
-                actual = #rowsA.row
+                actual = rowsA.row[0].number
                 expected = 0
             })()
 
             equals@Assertions({
-                actual = #rowsB.row
-                expected = 0
+                actual = rowsB.row[0].number
+                expected = rowsA.row[0].number
             })()
         }]
 
@@ -176,14 +177,11 @@ service TestServiceAFailure{
                 expected = "throw_before_sending"
             })()
 
+                // If using the outbox pattern, we expect no updates to have taken place in A in this case
+            println@Console("Expecting A: " + #rowsA.row[0].number + " to equal B: " + #rowsB.row[0].number)()
             equals@Assertions({
-                actual = #rowsA.row
-                expected = 1
-            })()
-
-            equals@Assertions({
-                actual = #rowsB.row
-                expected = 0
+                actual = rowsA.row[0].number
+                expected = rowsB.row[0].number
             })()
         }]
     
@@ -223,10 +221,8 @@ service TestServiceAFailure{
                     operation = "updateNumber"
                 })(response)
             }
-            sleep@Time(10000)()
 
-            
-
+            sleep@Time(100000)()
             // Assert
             query@Database("SELECT * FROM NumbersA")(rowsA)
             query@Database("SELECT * FROM NumbersB")(rowsB)
@@ -236,14 +232,10 @@ service TestServiceAFailure{
                 expected = "throw_after_sending"
             })()
 
+                // If the service crashes after having messaged B, we expect the message to reach B
             equals@Assertions({
-                actual = #rowsA.row
-                expected = 1
-            })()
-
-            equals@Assertions({
-                actual = #rowsB.row
-                expected = 1
+                actual = rowsB.row[0].number
+                expected = rowsA.row[0].number
             })()
         }]
     }

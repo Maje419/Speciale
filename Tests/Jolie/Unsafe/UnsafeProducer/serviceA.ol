@@ -21,13 +21,13 @@ interface ServiceAInterface{
 
 service ServiceA(p : testParams){
     execution: concurrent
-    // inputPort ServiceAExternal {
-    //     location: "socket://localhost:8080"
-    //     protocol: http{
-    //         format = "json"
-    //     }
-    //     interfaces: ServiceAInterface
-    // }
+    inputPort ServiceAExternal {
+        location: "socket://localhost:8080"
+        protocol: http{
+            format = "json"
+        }
+        interfaces: ServiceAInterface
+    }
 
     inputPort ServiceATests {
         location: "local"
@@ -69,7 +69,7 @@ service ServiceA(p : testParams){
 
             // 0. No updates have yet happened in this service, so the two databases should still be synchronized
             if (p.throw_before_updating_local){
-                throw ( TestException, "throw_after_updating" )
+                throw ( TestException, "throw_before_updating" )
             }
 
             // 1: Service A updates its local state

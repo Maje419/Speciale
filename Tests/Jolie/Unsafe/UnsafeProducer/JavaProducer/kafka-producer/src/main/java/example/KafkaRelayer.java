@@ -16,8 +16,9 @@ import jolie.runtime.Value;
 public class KafkaRelayer extends JavaService {
 
     public void propagateMessage(Value input) {
+        System.out.println("Hello");
         Properties props = new Properties();
-        props.put("bootstrap.servers", "localhost:9092");
+        props.put("bootstrap.servers", "localhost:29092");
         props.put("group.id", "test-group");
         props.put("max.poll.records", "10");
         props.put("enable.auto.commit", "true");
@@ -49,7 +50,10 @@ public class KafkaRelayer extends JavaService {
                 }
             }
         };
+
+        System.out.println("Hello2");
         producer.send(message, cb);
+        System.out.println("Hello3");
         producer.close();
     }
 }

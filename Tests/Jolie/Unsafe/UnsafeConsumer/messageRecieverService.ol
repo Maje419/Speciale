@@ -25,7 +25,8 @@ service MRS(p: MRSInput){
 
     main 
     {
-        Initialize@KafkaConsumer("Hi");
+        Initialize@KafkaConsumer("Hi")
+        sleep@Time(500)()
         while (true) {
             Consume@KafkaConsumer("Consuming")( consumerMessage )
             if (#consumerMessage.messages > 0){
