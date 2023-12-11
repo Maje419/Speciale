@@ -1,7 +1,6 @@
-include "database.iol"
-include "console.iol"
-include "serviceBInterface.iol"
-
+from .serviceBInterface import ServiceBInterface
+from database import Database
+from console import Console
 from runtime import Runtime
 
 service ServiceB{
@@ -21,6 +20,8 @@ service ServiceB{
         interfaces: ServiceBInterface
     }
     embed Runtime as Runtime
+    embed Database as Database
+    embed Console as Console
 
     init 
     {
@@ -49,7 +50,8 @@ service ServiceB{
     main 
     {
         [updateLocalDb( message )]{
-            update@Database("UPDATE NumbersB SET number = number + 1 WHERE username = \"" + message + "\"")()
+            println@Console("UpdateMessage Called")()
+            update@Database("UPDATE NumbersB SET number = number + 1 WHERE username = \"user1\"")()
         }
     }
 }

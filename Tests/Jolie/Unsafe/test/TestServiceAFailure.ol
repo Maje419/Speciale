@@ -1,4 +1,5 @@
-from ..UnsafeProducer.serviceA import ServiceAInterface
+from ..UnsafeProducer.serviceA import ServiceA
+from ..UnsafeConsumer.serviceB import ServiceB
 
 from assertions import Assertions
 from runtime import Runtime
@@ -10,7 +11,7 @@ from database import Database
 interface TestServiceAFailureInterface {
     RequestResponse:
         /// @BeforeAll
-        connectToDb(void)(void),
+        loadEmbeddedAndConnectToDb(void)(void),
 
         /// @Test
         failure_before_updating_local(void)(void) throws AssertionError(string),
@@ -27,26 +28,25 @@ interface TestServiceAFailureInterface {
 
 service TestServiceAFailure{
     execution: sequential
+
     inputPort TestInterface {
         Location: "local"
         Interfaces: TestServiceAFailureInterface 
     }
-        
-    outputPort ServiceUnderTest {
-        Location: "local"
-        Interfaces: ServiceAInterface
-    }
-
+    
     embed Assertions as Assertions
     embed Database as Database
     embed Time as Time
     embed Runtime as Runtime
     embed Console as Console
     embed Reflection as Reflection
+    embed ServiceA as ServiceA
+    embed ServiceB as ServiceB
 
     main
     {
-        [connectToDb()(){
+        [loadEmbeddedAndConnectToDb()(){
+            // Connect to db
             println@Console("\n\n------------------ Connecting to Database ------------------")()
             with ( connectionInfo ) 
             {
@@ -57,6 +57,10 @@ service TestServiceAFailure{
             .driver = "sqlite"
             };
             connect@Database(connectionInfo)()
+
+            loadEmbeddedService@Runtime({
+                .filepath = "../UnsafeConsumer/serviceB.ol"
+            })( )
         }]
 
         [clearTables()(){
@@ -74,39 +78,22 @@ service TestServiceAFailure{
             println@Console("\n\n------------------ Executing 'failure_before_updating_local' ------------------")()
             // Arrange:
             testScenario << {
-                .throw_before_updating_local =  true,
-                .throw_before_sending= false,
-                .throw_after_sending = false
+                .serviceA << {
+                    .throw_before_updating_local =  true,
+                    .throw_before_sending= false,
+                    .throw_after_sending = false
+                }
             }
 
-            loadEmbeddedService@Runtime({
-                .filepath = "../UnsafeProducer/serviceA.ol"
-                .params << testScenario 
-            })(serviceLocation)
-
-            loadEmbeddedService@Runtime({
-                .filepath = "../UnsafeConsumer/serviceB.ol"
-                .params << testScenario 
-            })( )
-
-            setOutputPort@Runtime({
-                location = "local",
-                name = "TestOneOPP",
-                location << serviceLocation
-            })()
+            setupTest@ServiceA(testScenario)(_)
 
             // Act
             scope ( ExecuteUpdate ){
                 install( TestException => println@Console("Exception: " + ExecuteUpdate.TestException)() )
-                
-                invoke@Reflection({
-                    outputPort = "TestOneOPP"
-                    data << {.username = "user1"}
-                    operation = "updateNumber"
-                })(response)
+                updateNumber@ServiceA({.username = "user1"})()
             }
 
-            sleep@Time(10000)()
+            // sleep@Time(10000)()
 
             //Assert
             query@Database("SELECT * FROM NumbersA")(rowsA)
@@ -117,7 +104,7 @@ service TestServiceAFailure{
                 expected = "throw_before_updating"
             })()
 
-                // If A crashes before having updated itself, no update should take place 
+            // If A crashes before having updated itself, no update should take place 
             equals@Assertions({
                 actual = rowsA.row[0].number
                 expected = 0
@@ -133,9 +120,11 @@ service TestServiceAFailure{
             println@Console("\n\n------------------ Executing 'failure_before_forwarding_update' ------------------")()
             // Arrange:
             testScenario << {
-                .throw_before_updating_local =  false,
-                .throw_before_sending= true,
-                .throw_after_sending = false
+                .serviceA << {
+                    .throw_before_updating_local =  false,
+                    .throw_before_sending= true,
+                    .throw_after_sending = false
+                }
             }
 
             with (loadEmbeddedRequest){
@@ -143,30 +132,14 @@ service TestServiceAFailure{
                 .params << testScenario 
             }
 
-            loadEmbeddedService@Runtime(loadEmbeddedRequest)(serviceLocation)
-
-            loadEmbeddedService@Runtime({
-                .filepath = "../UnsafeConsumer/serviceB.ol"
-                .params << testScenario 
-            })( )
-
-            setOutputPort@Runtime({
-                location = "local",
-                name = "TestTwoOPP",
-                location << serviceLocation
-            })()
+            setupTest@ServiceA(testScenario)(_)
 
             // Act
             scope ( ExecuteUpdate ){
                 install( TestException => println@Console("Exception: " + ExecuteUpdate.TestException)() )
-                
-                invoke@Reflection({
-                    outputPort = "TestTwoOPP"
-                    data << {.username = "user1"}
-                    operation = "updateNumber"
-                })(response)
+                updateNumber@ServiceA({.username = "user1"})()
             }
-            sleep@Time(10000)()
+            sleep@Time(5000)()
 
             //Assert
             query@Database("SELECT * FROM NumbersA")(rowsA)
@@ -189,40 +162,23 @@ service TestServiceAFailure{
             println@Console("\n\n------------------ Executing 'failure_after_forwarding_update' ------------------")()
             // Arrange:
             testScenario << {
-                .throw_before_updating_local =  false,
-                .throw_before_sending= false,
-                .throw_after_sending = true
+                .serviceA << {
+                    .throw_before_updating_local =  false,
+                    .throw_before_sending= false,
+                    .throw_after_sending = true
+                }
             }
 
-            with (loadEmbeddedRequest){
-                .filepath = "../UnsafeProducer/serviceA.ol";
-                .params << testScenario 
-            }
-
-            loadEmbeddedService@Runtime(loadEmbeddedRequest)(serviceLocation)
-            loadEmbeddedService@Runtime({
-                .filepath = "../UnsafeConsumer/serviceB.ol"
-                .params << testScenario 
-            })( )
-
-            setOutputPort@Runtime({
-                location = "local",
-                name = "TestThreeOPP",
-                location << serviceLocation
-            })()
+            setupTest@ServiceA(testScenario)(_)
 
             // Act
             scope ( ExecuteUpdate ){
                 install( TestException => println@Console("Exception: " + ExecuteUpdate.TestException)() )
-                
-                invoke@Reflection({
-                    outputPort = "TestThreeOPP"
-                    data << {.username = "user1"}
-                    operation = "updateNumber"
-                })(response)
+                updateNumber@ServiceA({.username = "user1"})()
             }
 
-            sleep@Time(100000)()
+            sleep@Time(10000)()
+            
             // Assert
             query@Database("SELECT * FROM NumbersA")(rowsA)
             query@Database("SELECT * FROM NumbersB")(rowsB)

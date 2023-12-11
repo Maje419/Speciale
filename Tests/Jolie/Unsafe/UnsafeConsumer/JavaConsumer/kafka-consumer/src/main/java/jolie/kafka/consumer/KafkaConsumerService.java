@@ -20,6 +20,7 @@ public class KafkaConsumerService extends JavaService {
 
     public void Initialize(Value input) {
         Properties props = new Properties();
+
         props.setProperty("bootstrap.servers", "localhost:29092");
         props.setProperty("group.id", "example-group");
         props.setProperty("enable.auto.commit", "true");
@@ -33,6 +34,7 @@ public class KafkaConsumerService extends JavaService {
     }
 
     public Value Consume(Value input) {
+        System.out.println("Consuming!");
         ConsumerRecords<String, String> records = null;
         ArrayList<String> messages = new ArrayList<>();
 

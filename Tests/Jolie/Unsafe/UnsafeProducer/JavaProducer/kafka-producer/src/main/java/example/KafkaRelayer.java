@@ -43,7 +43,6 @@ public class KafkaRelayer extends JavaService {
                             "Offset: " + recordMetadata.offset() + "\n" +
                             "Timestamp: " + recordMetadata.timestamp();
                     System.out.println(response);
-
                 } else {
                     response = e.getMessage();
                     System.out.println(response);
@@ -51,9 +50,7 @@ public class KafkaRelayer extends JavaService {
             }
         };
 
-        System.out.println("Hello2");
         producer.send(message, cb);
-        System.out.println("Hello3");
         producer.close();
     }
 }

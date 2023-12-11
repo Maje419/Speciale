@@ -1,5 +1,8 @@
-interface  SimpleKafkaConnectorInterface {
+from ..test.testTypes import TestParams
+
+interface SimpleKafkaConnectorInterface {
     OneWay: propagateMessage ( string )
+
 }
 
 service SimpleKafkaConnector{

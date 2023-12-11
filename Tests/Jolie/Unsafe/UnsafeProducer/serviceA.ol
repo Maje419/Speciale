@@ -1,12 +1,12 @@
-include "database.iol"
-include "console.iol"
-include "time.iol"
-include "file.iol"
+from database import Database
+from console import Console
+from time import Time
+from file import File
 
 from runtime import Runtime
 from .simple-kafka-connector import SimpleKafkaConnector
 
-from ..test.testTypes import testParams, TestExceptionType
+from ..test.testTypes import TestParams, TestExceptionType
 
 type UpdateNumberRequest {
     .username : string
@@ -16,10 +16,11 @@ type UpdateNumberResponse: string
 
 interface ServiceAInterface{
     RequestResponse:
-        updateNumber( UpdateNumberRequest )( UpdateNumberResponse ) throws TestException(TestExceptionType)
+        updateNumber( UpdateNumberRequest )( UpdateNumberResponse ) throws TestException(TestExceptionType),
+        setupTest( TestParams )( bool )
 }
 
-service ServiceA(p : testParams){
+service ServiceA{
     execution: concurrent
     inputPort ServiceAExternal {
         location: "socket://localhost:8080"
@@ -36,7 +37,10 @@ service ServiceA(p : testParams){
         }
         interfaces: ServiceAInterface
     }
-
+    embed Time as Time
+    embed Database as Database
+    embed File as File
+    embed Console as Console
     embed SimpleKafkaConnector as KafkaRelayer
     embed Runtime as Runtime
 
@@ -51,7 +55,7 @@ service ServiceA(p : testParams){
             .driver = "sqlite"
         };
         
-        connect@Database( connectionInfo )( void );
+        connect@Database( connectionInfo )( void )
         scope ( createTable ) 
         {
             install ( SQLException => println@Console("Table already exists")() );
@@ -63,12 +67,17 @@ service ServiceA(p : testParams){
     }
 
     main {
+        [setupTest( testParams )( res ){
+            global.p << testParams
+            res = true
+        }]
+
         [ updateNumber( request )( response )
         {
             updateQuery = "UPDATE NumbersA SET number = number + 1 WHERE username = \"" + request.username + "\""
 
             // 0. No updates have yet happened in this service, so the two databases should still be synchronized
-            if (p.throw_before_updating_local){
+            if (global.p.serviceA.throw_before_updating_local){
                 throw ( TestException, "throw_before_updating" )
             }
 
@@ -76,17 +85,16 @@ service ServiceA(p : testParams){
             update@Database( updateQuery )( updateResponse )
 
             // 2. Service A is now out of sync with Service B, and has not yet sent an update to B  
-            if (p.throw_before_sending){
+            if (global.p.serviceA.throw_before_sending){
                 throw ( TestException, "throw_before_sending")
             }
 
             // 3: Propagate the updated username into Kafka
             propagateMessage@KafkaRelayer( request.username )
             
-            if (p.throw_after_sending){
+            if (global.p.serviceA.throw_after_sending){
                 throw ( TestException, "throw_after_sending" )
             }
-
             response = "Update succeded!"
         }]
     }
