@@ -46,7 +46,7 @@ public class KafkaConsumerService extends JavaService {
                         public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
                             latch.countDown();
                         }
-                    }); // TODO: Check if it makes sense to use assign here instead
+                    });
         }
         try {
             latch.await();

@@ -240,7 +240,7 @@ service ServiceBFailure{
             })()
         }]
 
-        // The below test needs to go into its own file, as it crashes the MRS
+        // The below test needs to go into its own file, it is very flaky, since it's 'random' whether the MRS crashes before 
         /*[Services_are_out_of_sync_if_MRS_throws_before_recursing()(){
             // Note that the result of this test would be very different if multiple messages were put into kafka before B was initialized.
             // In such a case, MRS would only forward the first message to B, and the rest would be dropped. Testing this requires me to
