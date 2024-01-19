@@ -44,6 +44,7 @@ public class KafkaConsumerService extends JavaService {
 
                         @Override
                         public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
+                            System.out.println("Consumer partitions revoked");
                             latch.countDown();
                         }
                     });
@@ -82,11 +83,4 @@ public class KafkaConsumerService extends JavaService {
 
         return response;
     }
-
-    /**
-     * kafkaTestObject.setupConsumer( {topic: string} ) => Sets up new consumer
-     * which is subscribed to 'topic', allowing for monitoring messages
-     * kafkaTestObject.setupProducer( {topig: string} ) => Sets up a new producer
-     * which can be used to input messages into kafka
-     */
 }

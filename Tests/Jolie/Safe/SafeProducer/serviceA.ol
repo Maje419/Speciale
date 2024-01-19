@@ -12,7 +12,8 @@ type UpdateNumberResponse: string
 
 interface ServiceAInterface{
     RequestResponse:
-        updateNumber( UpdateNumberRequest )( UpdateNumberResponse )
+        updateNumber( UpdateNumberRequest )( UpdateNumberResponse ),
+        setupTest( TestParams )( bool )
 }
 
 service ServiceA{
@@ -70,6 +71,11 @@ service ServiceA{
     }
 
     main {
+        [setupTest( testParams )( res ){
+            global.testParams << testParams.serviceA
+            res = true
+        }]
+        
         [ updateNumber( request )( response )
         {
             println@Console("UpdateNumber called with username " + request.username)()
