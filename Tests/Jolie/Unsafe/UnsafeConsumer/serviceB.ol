@@ -1,4 +1,6 @@
 from .serviceBInterface import ServiceBInterface
+from .messageRecieverService import MRSInterface
+from ..test.testTypes import TestExceptionType
 from database import Database
 from console import Console
 from runtime import Runtime
@@ -12,6 +14,7 @@ service ServiceB{
     //     }
     //     interfaces: ServiceBInterface
     // }
+    
     inputPort ServiceBLocal {
         location: "local" 
         protocol: http{
@@ -19,6 +22,12 @@ service ServiceB{
         }
         interfaces: ServiceBInterface
     }
+
+    outputPort MRS {
+        Location: "local"
+        Interfaces: MRSInterface
+    }
+
     embed Runtime as Runtime
     embed Database as Database
     embed Console as Console
@@ -40,7 +49,7 @@ service ServiceB{
             params << {
                 mainServiceLocation << localLocation
             }
-        })( _ )
+        })( MRS.location )
 
         connect@Database(connectionInfo)()
         update@Database("CREATE TABLE IF NOT EXISTS NumbersB(username VARCHAR(50) NOT NULL, " +
@@ -49,9 +58,22 @@ service ServiceB{
 
     main 
     {
+        [setupTest( req )( res ){
+            global.testParams << req.serviceB
+            res = true
+        }] 
+        {
+            setupTest@MRS(req.serviceB.mrs)()
+        }
+
         [updateLocalDb( message )]{
-            println@Console("UpdateMessage Called")()
+            if (global.testParams.throw_before_updating_local){
+                throw (TestException, "throw_before_updating")
+            }
             update@Database("UPDATE NumbersB SET number = number + 1 WHERE username = \"user1\"")()
+            if (global.testParams.throw_after_updating_local){
+                throw (TestException, "throw_after_updating")
+            }
         }
     }
 }

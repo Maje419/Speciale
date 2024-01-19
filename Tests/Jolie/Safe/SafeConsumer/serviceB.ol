@@ -41,7 +41,6 @@ service ServiceB{
 
         connect@Database( connectionInfo )( void )
         update@Database("CREATE TABLE IF NOT EXISTS example(message VARCHAR(100));")()
-
     }
 
     main {

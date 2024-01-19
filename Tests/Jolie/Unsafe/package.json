@@ -3,6 +3,8 @@
     "@jolie/jot": "^0.0.25"
   },
   "scripts": {
-    "test": "jot jot.json"
+    "test": "jot jot.json",
+    "testProducer": "jot testProducer.json",
+    "testConsumer": "jot testConsumer.json"
   }
 }

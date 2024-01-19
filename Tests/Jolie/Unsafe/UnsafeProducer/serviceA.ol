@@ -22,14 +22,6 @@ interface ServiceAInterface{
 
 service ServiceA{
     execution: concurrent
-    inputPort ServiceAExternal {
-        location: "socket://localhost:8080"
-        protocol: http{
-            format = "json"
-        }
-        interfaces: ServiceAInterface
-    }
-
     inputPort ServiceATests {
         location: "local"
         protocol: http{
@@ -68,7 +60,7 @@ service ServiceA{
 
     main {
         [setupTest( testParams )( res ){
-            global.p << testParams
+            global.testParams << testParams.serviceA
             res = true
         }]
 
@@ -77,7 +69,7 @@ service ServiceA{
             updateQuery = "UPDATE NumbersA SET number = number + 1 WHERE username = \"" + request.username + "\""
 
             // 0. No updates have yet happened in this service, so the two databases should still be synchronized
-            if (global.p.serviceA.throw_before_updating_local){
+            if (global.testParams.throw_before_updating_local){
                 throw ( TestException, "throw_before_updating" )
             }
 
@@ -85,14 +77,14 @@ service ServiceA{
             update@Database( updateQuery )( updateResponse )
 
             // 2. Service A is now out of sync with Service B, and has not yet sent an update to B  
-            if (global.p.serviceA.throw_before_sending){
+            if (global.testParams.throw_before_sending){
                 throw ( TestException, "throw_before_sending")
             }
 
             // 3: Propagate the updated username into Kafka
             propagateMessage@KafkaRelayer( request.username )
             
-            if (global.p.serviceA.throw_after_sending){
+            if (global.testParams.throw_after_sending){
                 throw ( TestException, "throw_after_sending" )
             }
             response = "Update succeded!"

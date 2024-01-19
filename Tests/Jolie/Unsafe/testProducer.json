@@ -1,15 +1,9 @@
 {
-  "test": "test",
+  "test": "test/testProducer",
   "params": {
     "ServiceAFailure.ol": [
       {
         "name": "ServiceAFailure",
-        "params": {}
-      }
-    ],
-    "ServiceBFailure.ol": [
-      {
-        "name": "ServiceBFailure",
         "params": {}
       }
     ]

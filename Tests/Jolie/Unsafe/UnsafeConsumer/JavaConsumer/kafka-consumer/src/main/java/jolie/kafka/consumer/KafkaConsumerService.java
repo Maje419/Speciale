@@ -2,11 +2,15 @@ package jolie.kafka.consumer;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 
 //  Kafka imports
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 
@@ -19,6 +23,8 @@ public class KafkaConsumerService extends JavaService {
     private KafkaConsumer<String, String> consumer;
 
     public void Initialize(Value input) {
+        CountDownLatch latch = new CountDownLatch(1);
+
         Properties props = new Properties();
 
         props.setProperty("bootstrap.servers", "localhost:29092");
@@ -29,12 +35,27 @@ public class KafkaConsumerService extends JavaService {
         props.setProperty("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         synchronized (lock) {
             consumer = new KafkaConsumer<>(props);
-            consumer.subscribe(Arrays.asList("example"));
+            consumer.subscribe(Collections.singleton("example"),
+                    new ConsumerRebalanceListener() {
+                        @Override
+                        public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
+                            System.out.println("Consumer partitions revoked");
+                        }
+
+                        @Override
+                        public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
+                            latch.countDown();
+                        }
+                    }); // TODO: Check if it makes sense to use assign here instead
+        }
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            // Do nothing
         }
     }
 
     public Value Consume(Value input) {
-        System.out.println("Consuming!");
         ConsumerRecords<String, String> records = null;
         ArrayList<String> messages = new ArrayList<>();
 
@@ -61,4 +82,11 @@ public class KafkaConsumerService extends JavaService {
 
         return response;
     }
+
+    /**
+     * kafkaTestObject.setupConsumer( {topic: string} ) => Sets up new consumer
+     * which is subscribed to 'topic', allowing for monitoring messages
+     * kafkaTestObject.setupProducer( {topig: string} ) => Sets up a new producer
+     * which can be used to input messages into kafka
+     */
 }

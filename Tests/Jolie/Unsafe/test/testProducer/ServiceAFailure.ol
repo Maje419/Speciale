@@ -1,5 +1,5 @@
-from ..UnsafeProducer.serviceA import ServiceA
-from ..UnsafeConsumer.serviceB import ServiceB
+from ...UnsafeProducer.serviceA import ServiceA
+from ...UnsafeConsumer.serviceB import ServiceB
 
 from assertions import Assertions
 from runtime import Runtime
@@ -8,39 +8,30 @@ from time import Time
 from console import Console
 from database import Database
 
-interface TestServiceFailureInterface {
+interface ServiceAFailureInterface {
     RequestResponse:
         /// @BeforeAll
         connect_to_db(void)(void),
 
         /// @Test
-        A_failure_before_updating_local(void)(void) throws AssertionError(string),
+        Services_remain_in_sync_if_A_throws_before_updating_local(void)(void) throws AssertionError(string),
 
         /// @Test
-        A_failure_before_forwarding_update(void)(void) throws AssertionError(string),
+        Services_are_out_of_sync_if_A_throws_after_updating_local_but_before_forwarding(void)(void) throws AssertionError(string),
 
         /// @Test
-        A_failure_after_forwarding_update(void)(void) throws AssertionError(string),
-
-        /// @Test
-        B_failure_before_updating_local(void)(void) throws AssertionError(string),
-        
-        /// @Test
-        B_failure_after_updating_local(void)(void) throws AssertionError(string),
-
-        /// @Test
-        MRS_throw_on_message_received(void)(void) throws AssertionError(string),
+        Services_remain_in_sync_if_A_throws_after_forwarding_update(void)(void) throws AssertionError(string),
 
         /// @AfterEach
         clear_tables(void)(void)
 }
 
-service TestServiceFailure{
+service ServiceAFailure{
     execution: sequential
 
     inputPort TestInterface {
         Location: "local"
-        Interfaces: TestServiceFailureInterface 
+        Interfaces: ServiceAFailureInterface 
     }
     
     embed Assertions as Assertions
@@ -89,7 +80,7 @@ service TestServiceFailure{
 
         //  -------------- Service A Tests:
 
-        [A_failure_before_updating_local()(){
+        [Services_remain_in_sync_if_A_throws_before_updating_local()(){
             println@Console("\n\n------------------ Executing 'A_failure_before_updating_local' ------------------")()
             // Arrange:
             testScenario << {
@@ -132,7 +123,7 @@ service TestServiceFailure{
             })()
         }]
 
-        [A_failure_before_forwarding_update()(){
+        [Services_are_out_of_sync_if_A_throws_after_updating_local_but_before_forwarding()(){
             println@Console("\n\n------------------ Executing 'A_failure_before_forwarding_update' ------------------")()
             // Arrange:
             testScenario << {
@@ -167,15 +158,17 @@ service TestServiceFailure{
                 expected = "throw_before_sending"
             })()
 
-                // If using the outbox pattern, we expect no updates to have taken place in A in this case
-            println@Console("Expecting A: " + #rowsA.row[0].number + " to equal B: " + #rowsB.row[0].number)()
+            println@Console("Expecting A: " + rowsA.row[0].number + " to equal B: " + rowsB.row[0].number)()
+
+            // Since we've not implemented the outbox pattern, B wil never receive the message. 
+            // We therefore assume that the number in A is bigger than the number in B.
             equals@Assertions({
                 actual = rowsA.row[0].number
-                expected = rowsB.row[0].number
+                expected = rowsB.row[0].number + 1
             })()
         }]
     
-        [A_failure_after_forwarding_update()(){
+        [Services_remain_in_sync_if_A_throws_after_forwarding_update()(){
             println@Console("\n\n------------------ Executing 'A_failure_after_forwarding_update' ------------------")()
             // Arrange:
             testScenario << {
@@ -215,127 +208,127 @@ service TestServiceFailure{
 
         //  -------------- Service B Tests:
         
-        [B_failure_before_updating_local()(){
-            println@Console("\n\n------------------ Executing 'B_failure_before_updating_local' ------------------")()
-            // Arrange:
-            testScenario << {
-                .serviceA << {
-                    .throw_before_updating_local =  false,
-                    .throw_before_sending= false,
-                    .throw_after_sending = false
-                }
-                .serviceB << {
-                    .throw_before_updating_local = true
-                    .throw_after_updating_local = false
-                }
-            }
+        // [B_failure_before_updating_local()(){
+        //     println@Console("\n\n------------------ Executing 'B_failure_before_updating_local' ------------------")()
+        //     // Arrange:
+        //     testScenario << {
+        //         .serviceA << {
+        //             .throw_before_updating_local =  false,
+        //             .throw_before_sending= false,
+        //             .throw_after_sending = false
+        //         }
+        //         .serviceB << {
+        //             .throw_before_updating_local = true
+        //             .throw_after_updating_local = false
+        //         }
+        //     }
 
-            setupTest@ServiceA(testScenario)( )
-            setupTest@ServiceB(testScenario)( )
+        //     setupTest@ServiceA(testScenario)( )
+        //     setupTest@ServiceB(testScenario)( )
 
-            // Act
-            updateNumber@ServiceA({.username = "user1"})()
+        //     // Act
+        //     updateNumber@ServiceA({.username = "user1"})()
 
-            sleep@Time(10000)()
+        //     sleep@Time(10000)()
 
-            //Assert
-            query@Database("SELECT * FROM NumbersA")(rowsA)
-            query@Database("SELECT * FROM NumbersB")(rowsB)
+        //     //Assert
+        //     query@Database("SELECT * FROM NumbersA")(rowsA)
+        //     query@Database("SELECT * FROM NumbersB")(rowsB)
 
-            // If B crashes before having updated itself, A and B might be out of sync
-            equals@Assertions({
-                actual = rowsA.row[0].number
-                expected = 0
-            })()
+        //     // If B crashes before having updated itself, A and B might be out of sync
+        //     equals@Assertions({
+        //         actual = rowsA.row[0].number
+        //         expected = 0
+        //     })()
 
-            equals@Assertions({
-                actual = rowsB.row[0].number
-                expected = rowsA.row[0].number
-            })()
-        }]
+        //     equals@Assertions({
+        //         actual = rowsB.row[0].number
+        //         expected = rowsA.row[0].number
+        //     })()
+        // }]
 
-        [B_failure_after_updating_local()(){
-            println@Console("\n\n------------------ Executing 'B_failure_after_updating_local' ------------------")()
-            // Arrange:
-            testScenario << {
-                .serviceA << {
-                    .throw_before_updating_local =  false,
-                    .throw_before_sending= false,
-                    .throw_after_sending = false
-                }
-                .serviceB << {
-                    .throw_before_updating_local = false
-                    .throw_after_updating_local = true
-                }
-            }
+        // [B_failure_after_updating_local()(){
+        //     println@Console("\n\n------------------ Executing 'B_failure_after_updating_local' ------------------")()
+        //     // Arrange:
+        //     testScenario << {
+        //         .serviceA << {
+        //             .throw_before_updating_local =  false,
+        //             .throw_before_sending= false,
+        //             .throw_after_sending = false
+        //         }
+        //         .serviceB << {
+        //             .throw_before_updating_local = false
+        //             .throw_after_updating_local = true
+        //         }
+        //     }
 
-            setupTest@ServiceA(testScenario)( )
-            setupTest@ServiceB(testScenario)( )
+        //     setupTest@ServiceA(testScenario)( )
+        //     setupTest@ServiceB(testScenario)( )
 
-            // Act
-            updateNumber@ServiceA({.username = "user1"})()
+        //     // Act
+        //     updateNumber@ServiceA({.username = "user1"})()
 
-            sleep@Time(10000)()
+        //     sleep@Time(10000)()
 
-            //Assert
-            query@Database("SELECT * FROM NumbersA")(rowsA)
-            query@Database("SELECT * FROM NumbersB")(rowsB)
+        //     //Assert
+        //     query@Database("SELECT * FROM NumbersA")(rowsA)
+        //     query@Database("SELECT * FROM NumbersB")(rowsB)
 
-            // If B crashes before having updated itself, A and B might be out of sync
-            equals@Assertions({
-                actual = rowsA.row[0].number
-                expected = 0
-            })()
+        //     // If B crashes before having updated itself, A and B might be out of sync
+        //     equals@Assertions({
+        //         actual = rowsA.row[0].number
+        //         expected = 0
+        //     })()
 
-            equals@Assertions({
-                actual = rowsB.row[0].number
-                expected = rowsA.row[0].number
-            })()
-        }]
+        //     equals@Assertions({
+        //         actual = rowsB.row[0].number
+        //         expected = rowsA.row[0].number
+        //     })()
+        // }]
 
-        [MRS_throw_on_message_received()(){
-            println@Console("\n\n------------------ Executing 'MRS_throw_on_message_received' ------------------")()
-            // Arrange:
-            testScenario << {
-                .serviceA << {
-                    .throw_before_updating_local =  false
-                    .throw_before_sending= false
-                    .throw_after_sending = false
-                }
-                .serviceB << {
-                    .throw_before_updating_local = false
-                    .throw_after_updating_local = false
-                    .mrs << {
-                        .throw_on_message_found = true
-                        .throw_before_updating_main_service = false
-                        .throw_after_updating_main_service = false
-                        .throw_before_scheduling_timeout = false
-                    }
-                }
-            }
+        // [MRS_throw_on_message_received()(){
+        //     println@Console("\n\n------------------ Executing 'MRS_throw_on_message_received' ------------------")()
+        //     // Arrange:
+        //     testScenario << {
+        //         .serviceA << {
+        //             .throw_before_updating_local =  false
+        //             .throw_before_sending= false
+        //             .throw_after_sending = false
+        //         }
+        //         .serviceB << {
+        //             .throw_before_updating_local = false
+        //             .throw_after_updating_local = false
+        //             .mrs << {
+        //                 .throw_on_message_found = true
+        //                 .throw_before_updating_main_service = false
+        //                 .throw_after_updating_main_service = false
+        //                 .throw_before_scheduling_timeout = false
+        //             }
+        //         }
+        //     }
 
-            setupTest@ServiceA(testScenario)( )
-            setupTest@ServiceB(testScenario)( )
+        //     setupTest@ServiceA(testScenario)( )
+        //     setupTest@ServiceB(testScenario)( )
 
-            // Act
-            updateNumber@ServiceA({.username = "user1"})()
+        //     // Act
+        //     updateNumber@ServiceA({.username = "user1"})()
 
-            sleep@Time(10000)()
+        //     sleep@Time(10000)()
 
-            //Assert
-            query@Database("SELECT * FROM NumbersA")(rowsA)
-            query@Database("SELECT * FROM NumbersB")(rowsB)
+        //     //Assert
+        //     query@Database("SELECT * FROM NumbersA")(rowsA)
+        //     query@Database("SELECT * FROM NumbersB")(rowsB)
 
-            // If B crashes after having updated itself, A and B should not be desynced
-            equals@Assertions({
-                actual = rowsA.row[0].number
-                expected = 0
-            })()
+        //     // If B crashes after having updated itself, A and B should not be desynced
+        //     equals@Assertions({
+        //         actual = rowsA.row[0].number
+        //         expected = 0
+        //     })()
 
-            equals@Assertions({
-                actual = rowsB.row[0].number
-                expected = rowsA.row[0].number
-            })()
-        }]
+        //     equals@Assertions({
+        //         actual = rowsB.row[0].number
+        //         expected = rowsA.row[0].number
+        //     })()
+        // }]
     }
 }
