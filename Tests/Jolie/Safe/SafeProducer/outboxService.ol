@@ -3,6 +3,8 @@ include "console.iol"
 include "database.iol"
 from .messageForwarderService import MessageForwarderService
 
+from ..test.producerTestTypes import TestParams, TestExceptionType
+
 type KafkaOptions: void {   
     .bootstrapServers: string                   // The URL of the kafka server to connect to, e.g. "localhost:9092"
     .groupId: string                            // The group id of the kafka cluster to send messages to
@@ -40,7 +42,8 @@ interface OutboxInterface{
     RequestResponse:
         connectKafka( ConnectOutboxRequest ) ( StatusResponse ),
         connectRabbitMq( ConnectOutboxRequest ) ( StatusResponse ),
-        transactionalOutboxUpdate( UpdateOutboxRequest )( StatusResponse )
+        transactionalOutboxUpdate( UpdateOutboxRequest )( StatusResponse ),
+        setupTest( TestParams )( bool )
 }
 
 /**
@@ -56,11 +59,9 @@ service Outbox{
     embed MessageForwarderService as MessageForwarderService
 
     main {
-        [connectRabbitMq( request )( response ){
-            response.status = 500
-            response.reason = "Not implemented yet"
-
-            global.M_MessageBroker = "RabbitMq"
+        [setupTest( request )( response ){
+            global.testParams << request.testParams.outboxtests
+            setupTest@MessageForwarderService(request.testParams.mfsTests)( response )
         }]
 
         [connectKafka( request ) ( response ){
@@ -86,24 +87,30 @@ service Outbox{
             relayRequest.columnSettings.idColumn = "mid"
             relayRequest.brokerOptions << request.brokerOptions
             
-            startReadingMessages@MessageForwarderService( relayRequest )( relayResponse )
-            response << relayResponse
-            global.M_MessageBroker = "Kafka"
+            startReadingMessages@MessageForwarderService( relayRequest )
+            response << {status = 200, reson = "Connected successfully to Kafka"}
         }]
 
         [transactionalOutboxUpdate( request )( response ){
-            if (global.M_MessageBroker == "Kafka"){
-                println@Console( "Initiating transactional update" )(  )
-                install (ConnectionError => {response = "Call to update before connecting"} )
+            println@Console( "Initiating transactional update" )(  )
+            install (ConnectionError => {response = "Call to update before connecting"} )
 
-                updateMessagesTableQuery = "INSERT INTO outbox (kafkaKey, kafkaValue) VALUES (\"" + request.key + "\", \"" + request.value + "\");" 
-                transactionRequest.statement[0] = updateMessagesTableQuery
-                transactionRequest.statement[1] = request.sqlQuery
+            updateMessagesTableQuery = "INSERT INTO outbox (kafkaKey, kafkaValue) VALUES (\"" + request.key + "\", \"" + request.value + "\");" 
+            transactionRequest.statement[0] = updateMessagesTableQuery
+            transactionRequest.statement[1] = request.sqlQuery
 
-                executeTransaction@Database( transactionRequest )( transactionResponse )
-                response.status = 200
-                response.reason = "Transaction executed sucessfully"
+            if (global.testParams.throw_before_insert){
+                throw ( TestException, "throw_before_insert" )
             }
+
+            executeTransaction@Database( transactionRequest )( transactionResponse )
+
+            if (global.testParams.throw_after_insert){
+                throw ( TestException, "throw_after_insert" )
+            }
+            
+            response.status = 200
+            response.reason = "Transaction executed sucessfully"
         }]
     }
 }

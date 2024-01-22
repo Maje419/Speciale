@@ -3,12 +3,14 @@ include "console.iol"
 include "time.iol"
 
 from .outboxService import Outbox
+from ..test.producerTestTypes import TestParams, TestExceptionType
 
 type UpdateNumberRequest {
     .username : string
 }
 
 type UpdateNumberResponse: string
+
 
 interface ServiceAInterface{
     RequestResponse:
@@ -71,14 +73,13 @@ service ServiceA{
     }
 
     main {
-        [setupTest( testParams )( res ){
-            global.testParams << testParams.serviceA
-            res = true
+        [setupTest( request )( response ){
+            global.testParams << request.serviceA
+            setupTest@OutboxService( request )( response)
         }]
         
         [ updateNumber( request )( response )
         {
-            println@Console("UpdateNumber called with username " + request.username)()
             scope ( InsertData )    //Update the number in the database
             {   
                 install ( SQLException => println@Console( "SQL exception while trying to insert data" )( ) )
@@ -86,8 +87,19 @@ service ServiceA{
                 updateQuery.topic = "example"
                 updateQuery.key = request.username
                 updateQuery.value = "Updated number for " + request.username
+
+                // If thrown here, the outbox will never be updated, but neither is the local state, so services are consistant
+                if (global.testParams.throw_before_outbox_call){
+                    throw ( TestException, "throw_before_outbox_call" )
+                }
+                
                 transactionalOutboxUpdate@OutboxService( updateQuery )( updateResponse )
-                println@Console( "Update response: " + updateResponse )(  )
+                
+                // If thrown here, outbox is already updated, so eventual consistency is achieved
+                if (global.testParams.throw_after_outbox_call){
+                    throw ( TestException, "throw_after_outbox_call" )
+                }
+
                 response = "Choreography Started!"
             }
         }]
