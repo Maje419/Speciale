@@ -1,13 +1,14 @@
 from database import Database, ConnectionInfo
 from console import Console
 from time import Time
+from json_utils import JsonUtils
 
 from .outboxService import KafkaOptions
 from .outboxService import PollSettings
 from .outboxService import StatusResponse
 from .simple-kafka-connector import SimpleKafkaConnector
 
-from ..test.producerTestTypes import MFSTestParams, TestException
+from ..test.producerTestTypes import MFSTestParams, TestExceptionType
 
 type ColumnSettings {
     .keyColumn: string
@@ -45,6 +46,7 @@ service MessageForwarderService{
     embed Database as Database
     embed Time as Time
     embed Console as Console
+    embed JsonUtils as JsonUtils
 
     init {
         with ( connectionInfo ) 
@@ -98,7 +100,14 @@ service MessageForwarderService{
                     for ( databaseMessage in pulledMessages.row ){
                         kafkaMessage.topic = "example"
                         kafkaMessage.key = databaseMessage.(request.columnSettings.keyColumn)
-                        kafkaMessage.value = databaseMessage.(request.columnSettings.valueColumn)
+
+                        // Create a Json message to enter into Kafka, for easy parsing on consumer end
+                        getJsonString@JsonUtils({
+                            parameters = databaseMessage.(request.columnSettings.valueColumn), 
+                            mid = databaseMessage.mid
+                        }
+                        )(kafkaMessage.value)
+
                         kafkaMessage.brokerOptions << request.brokerOptions
                         propagateMessage@KafkaRelayer( kafkaMessage )( kafkaResponse )
 
@@ -108,7 +117,7 @@ service MessageForwarderService{
                         }
 
                         if (kafkaResponse.status == 200) {
-                            update@Database( "DELETE FROM outbox WHERE " + ( request.columnSettings.idColumn ) + " = " + databaseMessage.(request.columnSettings.idColumn) )( updateResponse )
+                            update@Database( "DELETE FROM outbox WHERE mid = \"" + databaseMessage.mid + "\";" )( updateResponse )
                         }
                     }
                 }

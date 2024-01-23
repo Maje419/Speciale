@@ -1,8 +1,7 @@
-include "console.iol"
-include "time.iol"
-include "database.iol"
-include "inboxTypes.iol"
+from .inboxTypes import InboxEmbeddingConfig, InboxInterface
 
+from console import Console
+from time import Time
 from .simple-kafka-connector import SimpleKafkaConsumerConnector
 
 interface MessageRetrieverInterface{
@@ -30,7 +29,7 @@ service MessageRetrieverService(p: InboxEmbeddingConfig) {
 
         with ( kafkaOptions )
         {
-            .bootstrapServer =  "localhost:9092";
+            .bootstrapServer =  "localhost:29092";
             .groupId = "test-group";
             .topic = "example"
         };

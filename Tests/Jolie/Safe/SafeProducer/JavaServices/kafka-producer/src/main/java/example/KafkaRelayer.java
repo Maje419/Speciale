@@ -31,8 +31,15 @@ public class KafkaRelayer extends JavaService {
                 "client.id",
                 input.getFirstChild("brokerOptions").getFirstChild("clientId").strValue());
 
+        // The message ID allows Kafka to make an imdepodent transaction
+        props.put(
+                "transactional.id",
+                input.getFirstChild("messageId").strValue());
+
         // For now, these values are non-configurable
         props.put("enable.auto.commit", "true");
+        props.put("enable.idempotence", "true");
+
         props.put("client.id", "testclient001");
         props.put("auto.commit.interval.ms", "500");
         props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");

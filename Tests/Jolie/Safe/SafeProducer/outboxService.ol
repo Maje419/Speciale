@@ -1,6 +1,7 @@
-include "time.iol"
-include "console.iol"
-include "database.iol"
+from database import Database, ConnectionInfo
+from string_utils import StringUtils
+from time import Time
+from console import Console
 from .messageForwarderService import MessageForwarderService
 
 from ..test.producerTestTypes import TestParams, TestExceptionType
@@ -42,7 +43,7 @@ interface OutboxInterface{
     RequestResponse:
         connectKafka( ConnectOutboxRequest ) ( StatusResponse ),
         connectRabbitMq( ConnectOutboxRequest ) ( StatusResponse ),
-        transactionalOutboxUpdate( UpdateOutboxRequest )( StatusResponse ),
+        transactionalOutboxUpdate( UpdateOutboxRequest )( StatusResponse ) throws TestException(TestExceptionType),
         setupTest( TestParams )( bool )
 }
 
@@ -57,6 +58,11 @@ service Outbox{
         Interfaces: OutboxInterface
     }
     embed MessageForwarderService as MessageForwarderService
+
+    embed StringUtils as StringUtils
+    embed Database as Database
+    embed Console as Console
+    embed Time as Time
 
     main {
         [setupTest( request )( response ){
@@ -75,7 +81,7 @@ service Outbox{
                     })
 
                 // Varchar size is not enforced by sqlite, we can insert a string of any length
-                updateRequest = "CREATE TABLE IF NOT EXISTS outbox (kafkaKey VARCHAR(50), kafkaValue VARCHAR (150), mid INTEGER PRIMARY KEY AUTOINCREMENT);"
+                updateRequest = "CREATE TABLE IF NOT EXISTS outbox (kafkaKey TEXT, kafkaValue TEXT, mid TEXT UNIQUE);"
                 update@Database( updateRequest )( ret )
             }
 
@@ -88,14 +94,15 @@ service Outbox{
             relayRequest.brokerOptions << request.brokerOptions
             
             startReadingMessages@MessageForwarderService( relayRequest )
-            response << {status = 200, reson = "Connected successfully to Kafka"}
+            response << {status = 200, reason = "Connected successfully to Kafka"}
         }]
 
         [transactionalOutboxUpdate( request )( response ){
             println@Console( "Initiating transactional update" )(  )
             install (ConnectionError => {response = "Call to update before connecting"} )
 
-            updateMessagesTableQuery = "INSERT INTO outbox (kafkaKey, kafkaValue) VALUES (\"" + request.key + "\", \"" + request.value + "\");" 
+            getRandomUUID@StringUtils( )( messageId ) 
+            updateMessagesTableQuery = "INSERT INTO outbox (kafkaKey, kafkaValue, mid) VALUES (\"" + request.key + "\", \"" + request.value + "\", \"" + messageId + "\");" 
             transactionRequest.statement[0] = updateMessagesTableQuery
             transactionRequest.statement[1] = request.sqlQuery
 

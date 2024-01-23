@@ -1,9 +1,7 @@
-include "database.iol"
-include "time.iol"
-include "console.iol"
-include "string_utils.iol"
-include "serviceBInterface.iol"
+from .serviceBInterface import ServiceBInterface
 
+from console import Console
+from database import Database
 from runtime import Runtime
 
 service ServiceB{
@@ -17,6 +15,8 @@ service ServiceB{
         }
         interfaces: ServiceBInterface
     }
+    embed Database as Database
+    embed Console as Console
     embed Runtime as Runtime
 
     init {

@@ -1,6 +1,6 @@
-include "database.iol"
-include "console.iol"
-include "time.iol"
+from database import Database, ConnectionInfo
+from console import Console
+from time import Time
 
 from .outboxService import Outbox
 from ..test.producerTestTypes import TestParams, TestExceptionType
@@ -14,8 +14,8 @@ type UpdateNumberResponse: string
 
 interface ServiceAInterface{
     RequestResponse:
-        updateNumber( UpdateNumberRequest )( UpdateNumberResponse ),
-        setupTest( TestParams )( bool )
+        updateNumber( UpdateNumberRequest )( UpdateNumberResponse ) throws TestException(TestExceptionType),
+        setupTest( TestParams )( bool ) 
 }
 
 service ServiceA{
@@ -28,6 +28,9 @@ service ServiceA{
         interfaces: ServiceAInterface
     }
     embed Outbox as OutboxService
+    embed Database as Database
+    embed Time as Time
+    embed Console as Console
 
     init
     {
@@ -48,7 +51,7 @@ service ServiceA{
 
         with ( kafkaOptions )
         {
-            .bootstrapServers =  "localhost:9092"
+            .bootstrapServers =  "localhost:29092"
             .groupId = "test-group"
         }
 

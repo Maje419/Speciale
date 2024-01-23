@@ -1,11 +1,10 @@
-include "console.iol"
-include "time.iol"
-include "database.iol"
-include "file.iol"
-include "inboxTypes.iol"
-include "serviceBInterface.iol"
+from .serviceBInterface import ServiceBInterface
+from .inboxTypes import InboxEmbeddingConfig, InboxInterface
 
+from console import Console
+from database import Database
 from runtime import Runtime
+from json_utils import JsonUtils
 
 service Inbox (p: InboxEmbeddingConfig){
     execution: concurrent
@@ -24,7 +23,10 @@ service Inbox (p: InboxEmbeddingConfig){
         }
         interfaces: ServiceBInterface
     }
+    embed Console as Console
+    embed Database as Database
     embed Runtime as Runtime
+    embed JsonUtils as JsonUtils
 
     init
     {
@@ -49,10 +51,9 @@ service Inbox (p: InboxEmbeddingConfig){
         scope ( createtable ) 
         {
             connect@Database( connectionInfo )()
-            update@Database( "CREATE TABLE IF NOT EXISTS inbox (username VARCHAR (150), hasBeenRead BOOLEAN, kafkaOffset INTEGER, rowid INTEGER PRIMARY KEY AUTOINCREMENT, UNIQUE(kafkaOffset));" )( ret )
+            update@Database( "CREATE TABLE IF NOT EXISTS inbox (request TEXT, hasBeenRead BOOLEAN, mid TEXT, UNIQUE(mid));" )( ret )
         }
         println@Console( "InboxServiceB Initialized" )(  )
-
     }
 
     main{
@@ -66,17 +67,20 @@ service Inbox (p: InboxEmbeddingConfig){
                 })
                 // Insert the request into the inbox table in the form:
                     // ___________________________________________________
-                    // |            request        | hasBeenRead | offset |
+                    // |            request        | hasBeenRead |  mid   |
                     // |———————————————————————————|—————————————|————————|
-                    // | 'operation':'parameter(s)'|   'false'   | offset |
+                    // |      'key': 'parameter(s)'|   'false'   |  uuid  |
                     // |——————————————————————————————————————————————————|
                     
-                println@Console("Key: " + req.key + "\nValue: " + req.value + "\nOffset: " + req.offset)()
+                println@Console("Key: " + req.key + "\nValue: " + req.value)()
 
-                update@Database("INSERT INTO inbox (request, hasBeenRead, kafkaOffset) VALUES (
-                    \""+ req.key + ":" + req.value +        // numbersUpdated:user1
-                    "\", false, " +                         // false
-                    req.offset + ")")()                      // offset
+                // The Parameters and the mid is stored in a Json string, so construct the object
+                getJsonValue@JsonUtils( req.value )( kafkaValue )
+
+                update@Database("INSERT INTO inbox (request, hasBeenRead, mid) VALUES (
+                    \""+ req.key + ":" + kafkaValue.parameters +        // numbersUpdated:user1
+                    "\", false, \"" +                         // false
+                    kafkaValue.mid + "\");")()                      // offset
             }
             res = "Message stored"
         }] 
