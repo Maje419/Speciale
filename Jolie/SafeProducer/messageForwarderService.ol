@@ -1,6 +1,7 @@
-include "database.iol"
-include "console.iol"
-include "time.iol"
+from database import Database, ConnectionInfo
+from console import Console
+from time import Time
+from json_utils import JsonUtils
 
 from .outboxService import KafkaOptions
 from .outboxService import PollSettings
@@ -26,7 +27,7 @@ type ForwarderResponse{
 }
 
 interface MessageForwarderInterface {
-    RequestResponse: startReadingMessages ( ForwarderServiceInfo ) ( StatusResponse )
+    OneWay: startReadingMessages ( ForwarderServiceInfo )
 }
 
 /**
@@ -38,6 +39,11 @@ service MessageForwarderService{
         Location: "local"
         Interfaces: MessageForwarderInterface
     }
+    embed Database as Database
+    embed Time as Time
+    embed Console as Console
+    embed JsonUtils as JsonUtils
+    
     embed SimpleKafkaConnector as KafkaRelayer
 
     init {
@@ -53,32 +59,33 @@ service MessageForwarderService{
 
     /** Starts this service reading continually from the 'Messages' table */
     main{
-        [startReadingMessages( request )( response ) 
-        {
-            scope (ConnectToDatabase){      // Everything in this scope is simply to check that a connection to the database CAN be opened.
-                global.M_KafkaOptions << request.brokerOptions
-                response.status = 200
-                response.reason = "MessageForwarderService initialized sucessfully"
-                println@Console( "MessageForwarder connected to database!" )(  )
-            }
-
-        }] 
+        [startReadingMessages( request )] 
         {
             // Keep polling for messages at a given interval.
             while(true) {
-                connect@Database( connectionInfo )( void )      //I hate that i cannot keep the connection open from above, but likely scoping issue
+                connect@Database( connectionInfo )( void )
                 query = "SELECT * FROM outbox LIMIT " + request.pollSettings.pollAmount
+                
                 query@Database(query)( pulledMessages )
                 println@Console( "Query '" + query + "' returned " + #pulledMessages.row + " rows " )(  )
+                
                 if (#pulledMessages.row > 0){
                     for ( databaseMessage in pulledMessages.row ){
                         kafkaMessage.topic = "example"
                         kafkaMessage.key = databaseMessage.(request.columnSettings.keyColumn)
-                        kafkaMessage.value = databaseMessage.(request.columnSettings.valueColumn)
-                        kafkaMessage.brokerOptions << global.M_KafkaOptions
+
+                        // Create a Json message to enter into Kafka, for easy parsing on consumer end
+                        getJsonString@JsonUtils({
+                            parameters = databaseMessage.(request.columnSettings.valueColumn), 
+                            mid = databaseMessage.mid
+                        }
+                        )(kafkaMessage.value)
+
+                        kafkaMessage.brokerOptions << request.brokerOptions
                         propagateMessage@KafkaRelayer( kafkaMessage )( kafkaResponse )
+
                         if (kafkaResponse.status == 200) {
-                            update@Database( "DELETE FROM outbox WHERE " + ( request.columnSettings.idColumn ) + " = " + databaseMessage.(request.columnSettings.idColumn) )( updateResponse )
+                            update@Database( "DELETE FROM outbox WHERE mid = \"" + databaseMessage.mid + "\";" )( updateResponse )
                         }
                     }
                 }

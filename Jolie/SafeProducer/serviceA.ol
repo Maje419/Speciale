@@ -1,6 +1,6 @@
-include "database.iol"
-include "console.iol"
-include "time.iol"
+from database import Database, ConnectionInfo
+from console import Console
+from time import Time
 
 from .outboxService import Outbox
 
@@ -10,9 +10,10 @@ type UpdateNumberRequest {
 
 type UpdateNumberResponse: string
 
+
 interface ServiceAInterface{
     RequestResponse:
-        updateNumber( UpdateNumberRequest )( UpdateNumberResponse )
+        updateNumber( UpdateNumberRequest )( UpdateNumberResponse ),
 }
 
 service ServiceA{
@@ -25,6 +26,9 @@ service ServiceA{
         interfaces: ServiceAInterface
     }
     embed Outbox as OutboxService
+    embed Database as Database
+    embed Time as Time
+    embed Console as Console
 
     init
     {
@@ -45,7 +49,7 @@ service ServiceA{
 
         with ( kafkaOptions )
         {
-            .bootstrapServers =  "localhost:9092"
+            .bootstrapServers =  "localhost:29092"
             .groupId = "test-group"
         }
 
@@ -72,7 +76,6 @@ service ServiceA{
     main {
         [ updateNumber( request )( response )
         {
-            println@Console("UpdateNumber called with username " + request.username)()
             scope ( InsertData )    //Update the number in the database
             {   
                 install ( SQLException => println@Console( "SQL exception while trying to insert data" )( ) )
@@ -80,8 +83,9 @@ service ServiceA{
                 updateQuery.topic = "example"
                 updateQuery.key = request.username
                 updateQuery.value = "Updated number for " + request.username
+
                 transactionalOutboxUpdate@OutboxService( updateQuery )( updateResponse )
-                println@Console( "Update response: " + updateResponse )(  )
+
                 response = "Choreography Started!"
             }
         }]
