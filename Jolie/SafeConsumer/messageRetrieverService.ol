@@ -54,13 +54,12 @@ service MessageRetrieverService(p: InboxEmbeddingConfig) {
         scheduleTimeout@Time( 500{
                 operation = "beginReading"
         } )(  )
-
     }
 
     main{
         [beginReading( req )]{
             consumeRequest.timeoutMs = 3000
-            
+
             Consume@KafkaConsumerConnector( consumeRequest )( consumeResponse )
             println@Console( "InboxService: Received " + #consumeResponse.messages + " messages from KafkaConsumerService" )(  )
 

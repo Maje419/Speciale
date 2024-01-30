@@ -1,17 +1,10 @@
 package com.mycompany.app;
 
-import java.sql.Time;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Properties;
-import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadPoolExecutor;
 
 //  Kafka imports
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -19,16 +12,12 @@ import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
-import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 
 //  Jolie imports
 import jolie.runtime.JavaService;
 import jolie.runtime.Value;
-import sun.nio.ch.ThreadPool;
-import sun.tools.jconsole.Messages;
 
 public class KafkaTestTool extends JavaService {
     private KafkaConsumer<String, String> testConsumer = null;
@@ -66,11 +55,10 @@ public class KafkaTestTool extends JavaService {
         // is probably inconsequential
         props.setProperty("max.poll.records", "1");
 
-        // We will likely need to always commit reads from the test class, otherwise
-        // tests might become flaky
-        props.setProperty("enable.auto.commit", "true");
-
-        props.setProperty("auto.commit.interval.ms", "1000");
+        // We will like to manually control committing, as it is needed to call "poll"
+        // to 'prime' the consumer and Kafka to actually realize that it's been assigned
+        // some partition
+        props.setProperty("enable.auto.commit", "false");
 
         // Use the default deserializer.
         props.setProperty("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
@@ -107,22 +95,21 @@ public class KafkaTestTool extends JavaService {
          * Hence the stupid dumb way I'm doing below, listing the topics until something
          * comes up.
          */
-
         try {
-            // Sleep until the consumer is attatched to some topic
-            while (testConsumer.listTopics().size() <= 0) {
-                // since the listTopics call is blocking until the server responds, most of the
-                // time the sleep should not
-                // even be called.
-                Thread.sleep(100);
+            while (testConsumer.assignment().size() <= 0) {
+                // I HAVE TO DO THIS DUMB SHOT FOR KAFKA TO REALIZE THAT THE CONSUMER HAS A
+                // PARTITION ASSIGNED vvv
+                testConsumer.poll(Duration.ofMillis(50));
+                Thread.sleep(1000);
             }
+            // SeekToEnd to only read new messages for each topic
+            testConsumer.seekToEnd(testConsumer.assignment());
             response.getFirstChild("status").setValue(("Ready"));
+            return response;
         } catch (InterruptedException e) {
-            testConsumer.unsubscribe();
-            testConsumer = null;
-            response.getFirstChild("status").setValue(("Interrupted"));
+            response.getFirstChild("status").setValue(("Error"));
+            return response;
         }
-        return response;
     }
 
     /**
@@ -145,7 +132,8 @@ public class KafkaTestTool extends JavaService {
         ConsumerRecords<String, String> records = new ConsumerRecords<>(null);
 
         // Block for 5 seconds before returning that no records were found
-        records = testConsumer.poll(Duration.ofSeconds(5));
+        records = testConsumer.poll(Duration.ofSeconds(10));
+        testConsumer.commitSync();
 
         if (records.isEmpty()) {
             response.getFirstChild("status").setValue("No records found");
@@ -183,6 +171,8 @@ public class KafkaTestTool extends JavaService {
         // For now, these values are non-configurable
         props.put("enable.auto.commit", "true");
         props.put("client.id", "testclient");
+        props.put("message.send.max.retries", "2");
+        props.put("queue.buffering.max.ms", "100");
         props.put("auto.commit.interval.ms", "500");
         props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
         props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
@@ -224,6 +214,7 @@ public class KafkaTestTool extends JavaService {
 
         // Send the message into kafka
         final CountDownLatch latch = new CountDownLatch(1);
+
         testProducer.send(message, new Callback() {
             public void onCompletion(RecordMetadata recordMetadata, Exception e) {
                 if (e == null) {

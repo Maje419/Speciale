@@ -18,6 +18,7 @@ service ServiceB{
     embed Database as Database
     embed Console as Console
     embed Runtime as Runtime
+    
     init {
         // Load the inbox service
         getLocalLocation@Runtime(  )( localLocation )

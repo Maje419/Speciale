@@ -23,7 +23,7 @@ public class KafkaRelayer extends JavaService {
         // Get these values from the request. We might want the rest of the values to
         // also be configurable, but this is future work.
         props.put("bootstrap.servers",
-                input.getFirstChild("brokerOptions").getFirstChild("bootstrapServer").strValue());
+                input.getFirstChild("brokerOptions").getFirstChild("bootstrapServers").strValue());
         props.put(
                 "group.id",
                 input.getFirstChild("brokerOptions").getFirstChild("groupId").strValue());
@@ -31,15 +31,8 @@ public class KafkaRelayer extends JavaService {
                 "client.id",
                 input.getFirstChild("brokerOptions").getFirstChild("clientId").strValue());
 
-        // The message ID allows Kafka to make an imdepodent transaction
-        props.put(
-                "transactional.id",
-                input.getFirstChild("messageId").strValue());
-
         // For now, these values are non-configurable
         props.put("enable.auto.commit", "true");
-        props.put("enable.idempotence", "true");
-
         props.put("client.id", "testclient001");
         props.put("auto.commit.interval.ms", "500");
         props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
@@ -55,6 +48,8 @@ public class KafkaRelayer extends JavaService {
                 input.getFirstChild("value").strValue());
         Value response = Value.create();
 
+        System.out.println("Here1");
+
         // The callback is executed once a response is recieved from Kafka
         producer.send(message, new Callback() {
             public void onCompletion(RecordMetadata recordMetadata, Exception e) {
@@ -65,10 +60,14 @@ public class KafkaRelayer extends JavaService {
                             "Partition: " + recordMetadata.partition() + "\n" +
                             "Offset: " + recordMetadata.offset() + "\n" +
                             "Timestamp: " + recordMetadata.timestamp();
+                    System.out.println("statusMessage: " + statusMessage);
+
                     response.getFirstChild("reason").setValue(statusMessage);
                     response.getFirstChild("status").setValue(200);
                 } else {
                     statusMessage = e.getMessage();
+                    System.out.println("statusMessage: " + statusMessage);
+
                     response.getFirstChild("reason").setValue(statusMessage);
                     response.getFirstChild("status").setValue(500);
                 }

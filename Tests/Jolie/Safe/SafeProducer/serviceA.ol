@@ -27,6 +27,16 @@ service ServiceA{
         }
         interfaces: ServiceAInterface
     }
+
+    // Here for tests
+    inputPort ServiceALocal {
+        location: "local" 
+        protocol: http{
+            format = "json"
+        }
+        interfaces: ServiceAInterface
+    }
+
     embed Outbox as OutboxService
     embed Database as Database
     embed Time as Time
@@ -77,6 +87,7 @@ service ServiceA{
 
     main {
         [setupTest( request )( response ){
+            println@Console("Setting up tests in serviceA")()
             global.testParams << request.serviceA
             setupTest@OutboxService( request )( response)
         }]

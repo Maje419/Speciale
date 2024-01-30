@@ -8,12 +8,12 @@ service Main{
     main
     {
         with( kafkaSetup2 ){
-            .bootstrapServer = "localhost:9092"
+            .bootstrapServer = "localhost:29092"
             .topic = "example"
         }
 
         with( kafkaSetup1 ){
-            .bootstrapServer = "localhost:9092"
+            .bootstrapServer = "localhost:29092"
         }
 
         setupTestProducer@KafkaTestTool(kafkaSetup1)( producerResponse )

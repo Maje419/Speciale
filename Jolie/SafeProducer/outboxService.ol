@@ -49,7 +49,7 @@ interface OutboxInterface{
 * It will then embeds a 'MessageForwarderService', which reads from the 'Messages' table and forwards messages into Kafka.
 */
 service Outbox{
-    execution: sequential
+    execution: concurrent
     inputPort OutboxPort {
         Location: "local"
         Interfaces: OutboxInterface

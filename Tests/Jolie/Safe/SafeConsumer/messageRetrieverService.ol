@@ -5,9 +5,10 @@ from time import Time
 from .simple-kafka-connector import SimpleKafkaConsumerConnector
 
 interface MessageRetrieverInterface{
-
+    OneWay: beginReading( void )
 }
 service MessageRetrieverService(p: InboxEmbeddingConfig) {
+    execution: concurrent
     outputPort InboxPort {
         location: "local"
         protocol: http{
@@ -15,9 +16,17 @@ service MessageRetrieverService(p: InboxEmbeddingConfig) {
         }
         interfaces: InboxInterface            
     }
+    inputPort Self {
+        Location: "local"
+        Interfaces: MessageRetrieverInterface
+    }
+
+    embed Console as Console
+    embed Time as Time
+    
     embed SimpleKafkaConsumerConnector as KafkaConsumerConnector
 
-    main
+    init
     {
         InboxPort.location << p.localLocation
 
@@ -41,8 +50,17 @@ service MessageRetrieverService(p: InboxEmbeddingConfig) {
         }
 
         Initialize@KafkaConsumerConnector( inboxSettings )( initializedResponse )
-        consumeRequest.timeoutMs = 3000
-        while (true) {
+
+        scheduleTimeout@Time( 500{
+                operation = "beginReading"
+        } )(  )
+
+    }
+
+    main{
+        [beginReading( req )]{
+            consumeRequest.timeoutMs = 3000
+            
             Consume@KafkaConsumerConnector( consumeRequest )( consumeResponse )
             println@Console( "InboxService: Received " + #consumeResponse.messages + " messages from KafkaConsumerService" )(  )
 
@@ -51,12 +69,15 @@ service MessageRetrieverService(p: InboxEmbeddingConfig) {
                 recievedKafkaMessage << consumeResponse.messages[i]
                 recieveKafka@InboxPort( recievedKafkaMessage )( recievedKafkaMessageResponse )
                 if ( recievedKafkaMessageResponse == "Message stored" ||
-                     recievedKafkaMessageResponse == "Message already recieveid, please re-commit" ){
+                    recievedKafkaMessageResponse == "Message already recieveid, please re-commit" ){
                     commitRequest.offset = consumeResponse.messages[i].offset
                     Commit@KafkaConsumerConnector( commitRequest )( commitResponse )
                 }
             }
-            sleep@Time( 1000 )(  )
+
+            scheduleTimeout@Time( 500{
+                operation = "beginReading"
+            } )(  )
         }
     }
 }

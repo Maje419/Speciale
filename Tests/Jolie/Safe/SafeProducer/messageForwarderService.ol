@@ -38,6 +38,7 @@ interface MessageForwarderInterface {
 * then deleting the messages from the table when an ack is recieved fom Kafka
 */
 service MessageForwarderService{
+    execution: concurrent
     inputPort Input {
         Location: "local"
         Interfaces: MessageForwarderInterface
@@ -65,20 +66,17 @@ service MessageForwarderService{
         {
             // Keep polling for messages at a given interval.
             while(true) {
-                scope (EnsureTestContinues){
-                    install( TestException =>  {
-                        println@Console("Exception thrown from MFS: " + main.TestException)()
+                install( TestException =>  {
+                    println@Console("Exception thrown from MFS: " + main.TestException)()
 
-                        // Call this operation again
-                        scheduleTimeout@Time(500 {
-                            message << request
-                            operation = "startReadingMessages"
-                        })()
-                        
-                        // Rethrow the message such that tests can access it.
-                        throw (TestException, main.TestException)
-                    })
-                }
+                    // Call this operation again
+                    // scheduleTimeout@Time(500 {
+                    //     message << request
+                    //     operation = "startReadingMessages"
+                    // })()
+                    
+                    // Rethrow the message such that tests can access it.
+                })
 
                 connect@Database( connectionInfo )( void )
                 query = "SELECT * FROM outbox LIMIT " + request.pollSettings.pollAmount
@@ -89,8 +87,7 @@ service MessageForwarderService{
                 }
 
                 query@Database(query)( pulledMessages )
-                println@Console( "Query '" + query + "' returned " + #pulledMessages.row + " rows " )(  )
-                
+
                 // This throw should not cause desync issues
                 if (global.testParams.throw_after_message_found){
                     throw ( TestException, "throw_after_message_found" )
@@ -111,7 +108,7 @@ service MessageForwarderService{
                         kafkaMessage.brokerOptions << request.brokerOptions
                         propagateMessage@KafkaRelayer( kafkaMessage )( kafkaResponse )
 
-                        // This throw will likely result in the message being sent twice!
+                         // This throw will likely result in the message being sent twice!
                         if (global.testParams.throw_after_send_but_before_delete){
                             throw ( TestException, "throw_after_send_but_before_delete" )
                         }
@@ -124,8 +121,9 @@ service MessageForwarderService{
                 sleep@Time( request.pollSettings.pollDurationMS )(  )
             }
         }
-        
+
         [setupTest( request )( response ){
+            println@Console("Setting up tests in MFS")()
             global.testParams << request
             response = true
         }]

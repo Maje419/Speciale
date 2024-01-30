@@ -1,6 +1,6 @@
 type ServiceATests{
     .throw_before_outbox_call*: bool
-    .thro_after_outbox_call*: bool
+    .throw_after_outbox_call*: bool
 }
 
 type OutboxTestParams {
