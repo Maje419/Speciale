@@ -3,7 +3,7 @@ from console import Console
 from time import Time
 
 from .outboxService import Outbox
-from ..test.producerTestTypes import TestParams, TestExceptionType
+from ..test.testTypes import ConsumerTests, TestExceptionType
 
 type UpdateNumberRequest {
     .username : string
@@ -15,7 +15,7 @@ type UpdateNumberResponse: string
 interface ServiceAInterface{
     RequestResponse:
         updateNumber( UpdateNumberRequest )( UpdateNumberResponse ) throws TestException(TestExceptionType),
-        setupTest( TestParams )( bool ) 
+        setupTest( ConsumerTests )( bool ) 
 }
 
 service ServiceA{
@@ -56,7 +56,7 @@ service ServiceA{
         with ( pollSettings )
         {
             .pollAmount = 3
-            .pollDurationMS = 3000
+            .pollDurationMS = 500
         }
 
         with ( kafkaOptions )
@@ -89,7 +89,7 @@ service ServiceA{
         [setupTest( request )( response ){
             println@Console("Setting up tests in serviceA")()
             global.testParams << request.serviceA
-            setupTest@OutboxService( request )( response)
+            setupTest@OutboxService( request )( response )
         }]
         
         [ updateNumber( request )( response )

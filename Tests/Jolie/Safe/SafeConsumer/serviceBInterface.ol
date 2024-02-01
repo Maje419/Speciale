@@ -1,3 +1,5 @@
+from ..test.testTypes import ProducerTests, TestExceptionType
+
 type UpdateDatabaseRequest{
     .userToUpdate: string
 }
@@ -9,5 +11,6 @@ type UpdateDatabaseResponse {
 
 interface ServiceBInterface{
     RequestResponse:
-        updateNumberForUser( UpdateDatabaseRequest )( UpdateDatabaseResponse )
+        updateNumberForUser( UpdateDatabaseRequest )( UpdateDatabaseResponse ),
+        setupTest( ProducerTests )( bool )
 }

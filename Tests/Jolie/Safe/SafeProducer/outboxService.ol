@@ -4,7 +4,7 @@ from time import Time
 from console import Console
 from .messageForwarderService import MessageForwarderService
 
-from ..test.producerTestTypes import TestParams, TestExceptionType
+from ..test.testTypes import ConsumerTests, TestExceptionType
 
 type KafkaOptions: void {   
     .bootstrapServers: string                   // The URL of the kafka server to connect to, e.g. "localhost:9092"
@@ -44,7 +44,7 @@ interface OutboxInterface{
         connectKafka( ConnectOutboxRequest ) ( StatusResponse ),
         connectRabbitMq( ConnectOutboxRequest ) ( StatusResponse ),
         transactionalOutboxUpdate( UpdateOutboxRequest )( StatusResponse ) throws TestException(TestExceptionType),
-        setupTest( TestParams )( bool )
+        setupTest( ConsumerTests )( bool )
 }
 
 /**
@@ -67,8 +67,8 @@ service Outbox{
     main {
         [setupTest( request )( response ){
             println@Console("Setting up tests in Outbox")()
-            global.testParams << request.testParams.outboxtests
-            setupTest@MessageForwarderService(request.testParams.mfsTests)( response )
+            global.testParams << request.outboxtests
+            setupTest@MessageForwarderService(request.mfsTests)( response )
         }]
 
         [connectKafka( request ) ( response ){

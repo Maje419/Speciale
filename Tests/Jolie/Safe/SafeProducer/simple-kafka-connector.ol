@@ -8,7 +8,7 @@ type KafkaMessage {
     .brokerOptions: KafkaOptions
 }
 
-interface  SimpleKafkaConnectorInterface {
+interface SimpleKafkaConnectorInterface {
     RequestResponse: propagateMessage ( KafkaMessage )( StatusResponse )
 }
 

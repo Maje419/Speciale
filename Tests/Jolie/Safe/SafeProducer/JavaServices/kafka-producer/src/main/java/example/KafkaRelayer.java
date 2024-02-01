@@ -48,8 +48,6 @@ public class KafkaRelayer extends JavaService {
                 input.getFirstChild("value").strValue());
         Value response = Value.create();
 
-        System.out.println("Here1");
-
         // The callback is executed once a response is recieved from Kafka
         producer.send(message, new Callback() {
             public void onCompletion(RecordMetadata recordMetadata, Exception e) {

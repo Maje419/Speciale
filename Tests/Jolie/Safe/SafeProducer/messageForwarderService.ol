@@ -8,7 +8,7 @@ from .outboxService import PollSettings
 from .outboxService import StatusResponse
 from .simple-kafka-connector import SimpleKafkaConnector
 
-from ..test.producerTestTypes import MFSTestParams, TestExceptionType
+from ..test.testTypes import MFSTestParams, TestExceptionType
 
 type ColumnSettings {
     .keyColumn: string
@@ -67,29 +67,31 @@ service MessageForwarderService{
             // Keep polling for messages at a given interval.
             while(true) {
                 install( TestException =>  {
+                    global.exceptionThrownForThisTest = true
                     println@Console("Exception thrown from MFS: " + main.TestException)()
 
-                    // Call this operation again
-                    // scheduleTimeout@Time(500 {
-                    //     message << request
-                    //     operation = "startReadingMessages"
-                    // })()
+                    //Call this operation again
+                    scheduleTimeout@Time(500 {
+                        message << request
+                        operation = "startReadingMessages"
+                    })()
                     
                     // Rethrow the message such that tests can access it.
+                    throw ( TestException, main.TestException )
                 })
 
                 connect@Database( connectionInfo )( void )
                 query = "SELECT * FROM outbox LIMIT " + request.pollSettings.pollAmount
                 
                 // This throw should not cause desync issues
-                if (global.testParams.throw_before_check_for_messages){
+                if (global.testParams.throw_before_check_for_messages && !global.exceptionThrownForThisTest){
                     throw ( TestException, "throw_before_check_for_messages" )
                 }
 
                 query@Database(query)( pulledMessages )
 
                 // This throw should not cause desync issues
-                if (global.testParams.throw_after_message_found){
+                if (global.testParams.throw_after_message_found && !global.exceptionThrownForThisTest){
                     throw ( TestException, "throw_after_message_found" )
                 }
                 
@@ -109,7 +111,7 @@ service MessageForwarderService{
                         propagateMessage@KafkaRelayer( kafkaMessage )( kafkaResponse )
 
                          // This throw will likely result in the message being sent twice!
-                        if (global.testParams.throw_after_send_but_before_delete){
+                        if (global.testParams.throw_after_send_but_before_delete && !global.exceptionThrownForThisTest){
                             throw ( TestException, "throw_after_send_but_before_delete" )
                         }
 
@@ -124,6 +126,7 @@ service MessageForwarderService{
 
         [setupTest( request )( response ){
             println@Console("Setting up tests in MFS")()
+            global.exceptionThrownForThisTest = false
             global.testParams << request
             response = true
         }]

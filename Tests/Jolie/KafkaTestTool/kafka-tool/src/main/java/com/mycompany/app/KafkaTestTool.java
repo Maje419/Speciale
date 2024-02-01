@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ThreadPoolExecutor;
 
 //  Kafka imports
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -45,7 +44,7 @@ public class KafkaTestTool extends JavaService {
         // scenario
         // props.setProperty("bootstrap.servers",
         // input.getFirstChild("bootstrapServer").strValue());
-        props.setProperty("bootstrap.servers", "localhost:9092");
+        props.put("bootstrap.servers", input.getFirstChild("bootstrapServer").strValue());
 
         // Giving this a seperate groupId from the actual services ensures that all
         // messages are still read by the original service
@@ -96,9 +95,11 @@ public class KafkaTestTool extends JavaService {
          * comes up.
          */
         try {
+            int i = 0;
             while (testConsumer.assignment().size() <= 0) {
                 // I HAVE TO DO THIS DUMB SHOT FOR KAFKA TO REALIZE THAT THE CONSUMER HAS A
                 // PARTITION ASSIGNED vvv
+                System.out.println("Consumer connecting, attempt " + i++);
                 testConsumer.poll(Duration.ofMillis(50));
                 Thread.sleep(1000);
             }
@@ -132,7 +133,7 @@ public class KafkaTestTool extends JavaService {
         ConsumerRecords<String, String> records = new ConsumerRecords<>(null);
 
         // Block for 5 seconds before returning that no records were found
-        records = testConsumer.poll(Duration.ofSeconds(10));
+        records = testConsumer.poll(Duration.ofSeconds(5));
         testConsumer.commitSync();
 
         if (records.isEmpty()) {

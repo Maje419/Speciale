@@ -1,0 +1,11 @@
+{
+  "test": "test/testConsumer",
+  "params": {
+    "ServiceBFailure.ol": [
+      {
+        "name": "ServiceBFailure",
+        "params": {}
+      }
+    ]
+  }
+}

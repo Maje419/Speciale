@@ -89,5 +89,9 @@ service Inbox (p: InboxEmbeddingConfig){
             updateUserRequest.userToUpdate = req.key
             updateNumberForUser@EmbedderInput( updateUserRequest )()
         }
+
+        [setupTest( request )( response ){
+            
+        }]
     }
 }

@@ -1,3 +1,5 @@
+from ..test.testTypes import ProducerTests, TestExceptionType
+
 type KafkaOptions: void {   
     .bootstrapServer: string                   // The URL of the kafka server to connect to, e.g. "localhost:9092"
     .groupId: string                            // The group id of the kafka cluster to send messages to
@@ -32,5 +34,8 @@ type KafkaMessage {
 }
 
 interface InboxInterface {
-    RequestResponse: recieveKafka( KafkaMessage )( string )
+    RequestResponse: 
+        recieveKafka( KafkaMessage )( string ),
+        setupTest( InboxTestParams )( bool )
+    
 }
