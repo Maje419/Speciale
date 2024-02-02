@@ -22,16 +22,27 @@ type ConsumerTests{
 }
 
 /***** Producer tests ******/
-type SeriveBTests{
+type ServiceBTests{
     .throw_before_search_inbox*: bool
     .throw_at_inbox_message_found*: bool
     .throw_after_transaction*: bool
 }
 
+type InboxTestParams{
+    .throw_on_message_found*: bool
+    .throw_before_updating_inbox*: bool
+    .throw_before_updating_main_service*: bool
+}
+
+type MRSTestParams{
+    .throw_after_message_found*: bool
+    .throw_after_before_inbox_responds*: bool
+}
+
 type ProducerTests {
     .serviceB*: ServiceBTests
     .inboxTests*: InboxTestParams
-    // .mrsTests*: MRSTestParams
+    .mrsTests*: MRSTestParams
 }
 
 type TestExceptionType: string

@@ -1,5 +1,6 @@
 from .serviceBInterface import ServiceBInterface
 from .inboxTypes import InboxEmbeddingConfig, InboxInterface
+from .messageRetrieverService import MessageRetrieverInterface
 
 from console import Console
 from database import Database
@@ -23,6 +24,13 @@ service Inbox (p: InboxEmbeddingConfig){
         }
         interfaces: ServiceBInterface
     }
+
+    // Used during tests to setup test cases in the MRS
+    outputPort MRS {
+        Location: "local"  // Overwritten in init
+        Interfaces: MessageRetrieverInterface
+    }
+
     embed Console as Console
     embed Database as Database
     embed Runtime as Runtime
@@ -34,11 +42,12 @@ service Inbox (p: InboxEmbeddingConfig){
 
         getLocalLocation@Runtime(  )( localLocation )   
         loadEmbeddedService@Runtime({
-            filepath = "messageRetrieverService.ol"
+            filepath = "./SafeConsumer/messageRetrieverService.ol"
             params << {
                 localLocation << localLocation
             }
-        })( MessageRetriever.location )
+        })( MRS.location )
+
 
         with ( connectionInfo ) 
         {
@@ -58,9 +67,13 @@ service Inbox (p: InboxEmbeddingConfig){
 
     main{
         [recieveKafka( req )( res ) {
+            if (global.testParams.throw_on_message_found && !global.hasThrownAfterForMessage){
+                global.hasThrownAfterForMessage = true
+                throw ( TestException, "throw_on_message_found" )
+            }
             // Kafka messages for our inbox/outbox contains the username in the 'key', and the parameters in the 'value'
             scope( MakeIdempotent ){
-                // If this exception is thrown, Kafka some commit message must have disappeared. Resend it.
+                // If this exception is thrown, its likely the unique constraint on the mid which failed
                 install( SQLException => {
                     println@Console("Message already recieved, commit request")();
                     res = "Message already recieveid, please re-commit"
@@ -77,6 +90,11 @@ service Inbox (p: InboxEmbeddingConfig){
                 // The Parameters and the mid is stored in a Json string, so construct the object
                 getJsonValue@JsonUtils( req.value )( kafkaValue )
 
+                if (global.testParams.throw_before_updating_inbox && !global.hasThrownAfterForMessage){
+                    global.hasThrownAfterForMessage = true
+                    throw ( TestException, "throw_before_updating_inbox" )
+                }
+
                 update@Database("INSERT INTO inbox (request, hasBeenRead, mid) VALUES (
                     \""+ req.key + ":" + kafkaValue.parameters +        // numbersUpdated:user1
                     "\", false, \"" +                         // false
@@ -85,13 +103,20 @@ service Inbox (p: InboxEmbeddingConfig){
             res = "Message stored"
         }] 
         {   
+            if (global.testParams.throw_before_updating_main_service && !global.hasThrownAfterForMessage){
+                global.hasThrownAfterForMessage = true
+                throw ( TestException, "throw_before_updating_main_service" )
+            }
+
             // In the future, we might use Reflection to hit the correct method in the embedder.
             updateUserRequest.userToUpdate = req.key
             updateNumberForUser@EmbedderInput( updateUserRequest )()
         }
 
         [setupTest( request )( response ){
-            
+            global.testParams << request.inboxTests
+            global.hasThrownAfterForMessage = true
+            setupTest@MRS( request.mrsTests )( response )
         }]
     }
 }

@@ -1,4 +1,5 @@
 from ...SafeConsumer.serviceB import ServiceB
+from ....KafkaTestTool.kafkaTestTool import KafkaTestTool
 from ..assertions import Assertions
 
 from runtime import Runtime
@@ -6,14 +7,15 @@ from reflection import Reflection
 from time import Time
 from console import Console
 from database import Database
+from json_utils import JsonUtils
 
 interface ServiceBFailureInterface {
     RequestResponse:
         /// @BeforeAll
         connect_to_db(void)(void),
 
-        // /// @Test
-        // Services_are_out_of_sync_if_B_throws_before_updating_local(void)(void) throws AssertionError(string),
+        /// @Test
+        test1(void)(void) throws AssertionError(string),
         
         // /// @Test
         // Services_remain_in_sync_if_B_throws_after_updating_local(void)(void) throws AssertionError(string),
@@ -38,14 +40,16 @@ service ServiceBFailure{
         Location: "local"
         Interfaces: ServiceBFailureInterface 
     }
-    
+    embed KafkaTestTool as KafkaTestTool
     embed Assertions as Assertions
+    embed ServiceB as ServiceB
+
+    embed JsonUtils as JsonUtils
     embed Database as Database
     embed Time as Time
     embed Runtime as Runtime
     embed Console as Console
     embed Reflection as Reflection
-    embed ServiceB as ServiceB
 
     main
     {
@@ -62,225 +66,76 @@ service ServiceBFailure{
             .driver = "sqlite"
             };
             connect@Database(connectionInfo)()
+            
+            // Setup the Kafka test tool:
+            println@Console("\n\n------------------ Starting Kafka Test Tool ------------------")()
+            setupTestConsumer@KafkaTestTool({
+                .bootstrapServer = "localhost:29092"      // As seen in .MRS for serviceB
+                .topic = "example"                          // ^^ Same
+            })()
+
+            setupTestProducer@KafkaTestTool({
+                .bootstrapServer = "localhost:29092"
+            })()
 
             println@Console("\n\n------------------ Clearing tables for next test ------------------")()
-            update@Database("DELETE FROM NumbersA WHERE true;")()
-            update@Database("DELETE FROM NumbersB WHERE true;")()
-            update@Database("INSERT INTO NumbersA VALUES('user1', 0);")()
-            update@Database("INSERT INTO NumbersB VALUES('user1', 0);")()
+            update@Database("DELETE FROM example WHERE true;")()
+            update@Database("DELETE FROM inbox WHERE true;")()
         }]
 
         [clear_tables()(){
+            // Sleep here to avoid having multiple tests manipulating the same dabatase file
+            sleep@Time(1000)()
             println@Console("\n\n------------------ Clearing tables for next test ------------------")()
-            sleep@Time(5000)()
-            update@Database("DELETE FROM NumbersA WHERE true;")()
-            update@Database("DELETE FROM NumbersB WHERE true;")()
-            update@Database("INSERT INTO NumbersA VALUES('user1', 0);")()
-            update@Database("INSERT INTO NumbersB VALUES('user1', 0);")()
-
-            undef(rowsA)
-            undef(rowsB)
+            update@Database("DELETE FROM example WHERE true;")()
+            update@Database("DELETE FROM inbox WHERE true;")()
         }]
 
         //  -------------- Service B Tests:
         
-        [Services_are_out_of_sync_if_B_throws_before_updating_local()(){
-            println@Console("\n\n------------------ Executing 'Services_are_out_of_sync_if_B_throws_before_updating_local' ------------------")()
-            // Arrange:
-            testScenario << {
-                .serviceA << {
-                    .throw_before_updating_local =  false,
-                    .throw_before_sending= false,
-                    .throw_after_sending = false
-                }
+        [test1()(){
+            // Arrange
+            with (testCase){
                 .serviceB << {
-                    .throw_before_updating_local = true
-                    .throw_after_updating_local = false
+                    .throw_before_search_inbox = true
+                    .throw_at_inbox_message_found = false
+                    .throw_after_transaction = false
+                }
+                .inboxTests << {
+                    .throw_on_message_found = false
+                    .throw_before_updating_inbox = false
+                    .throw_before_updating_main_service = false
+                }
+                .mrsTests << {
+                    .throw_after_message_found = false
+                    .throw_after_before_inbox_responds = false
                 }
             }
 
-            setupTest@ServiceA(testScenario)( )
-            setupTest@ServiceB(testScenario)( )
+            setupTest@ServiceB(testCase)()
+            with (message){
+                .topic = "example"
+                .key = "Test"
+            }
+
+            getJsonString@JsonUtils({
+                mid = 124
+                parameters = "user1"
+            })(message.value)
 
             // Act
-            updateNumber@ServiceA({.username = "user1"})()
+            send@KafkaTestTool(message)()
+            sleep@Time(2000)()
 
-            sleep@Time(5000)()
-
-            //Assert
-            query@Database("SELECT * FROM NumbersA")(rowsA)
-            query@Database("SELECT * FROM NumbersB")(rowsB)
-
-            // If B crashes before having updated itself, A and B might be out of sync
-            println@Console("Expecting A: " + rowsA.row[0].number + " to equal B: " + rowsB.row[0].number)()
+            // Assert
+            query@Database( "Select * from example;" )( queryResult )
+            println@Console("Found row: " + queryResult.row[0].message)()
+            println@Console("Found rows " + #queryResult.row)()
             equals@Assertions({
-                actual = rowsB.row[0].number + 1
-                expected = rowsA.row[0].number
+                actual = queryResult.row[0].message
+                expected = "Test:user1"
+                message = "Expected Test:user1 but found '" + queryResult.row[0].message + "'"
             })()
         }]
-
-        [Services_remain_in_sync_if_B_throws_after_updating_local()(){
-            println@Console("\n\n------------------ Executing 'Services_remain_in_sync_if_B_throws_after_updating_local' ------------------")()
-            
-            // Arrange:
-            testScenario << {
-                .serviceA << {
-                    .throw_before_updating_local =  false,
-                    .throw_before_sending= false,
-                    .throw_after_sending = false
-                }
-                .serviceB << {
-                    .throw_before_updating_local = false
-                    .throw_after_updating_local = true
-                }
-            }
-
-            setupTest@ServiceA(testScenario)( )
-            setupTest@ServiceB(testScenario)( )
-
-            // Act
-            updateNumber@ServiceA({.username = "user1"})()
-
-            sleep@Time(5000)()
-
-            //Assert
-            query@Database("SELECT * FROM NumbersA")(rowsA)
-            query@Database("SELECT * FROM NumbersB")(rowsB)
-
-            println@Console("Expecting A: " + rowsA.row[0].number + " to equal B: " + rowsB.row[0].number)()
-            equals@Assertions({
-                actual = rowsB.row[0].number
-                expected = rowsA.row[0].number
-            })()
-        }]
-
-        [Services_are_out_of_sync_if_MRS_throws_before_forwarding_message_to_B()(){
-            println@Console("\n\n------------------ Executing 'Services_are_out_of_sync_if_MRS_throws_before_forwarding_message_to_B' ------------------")()
-            // Arrange:
-            testScenario << {
-                .serviceA << {
-                    .throw_before_updating_local =  false
-                    .throw_before_sending= false
-                    .throw_after_sending = false
-                }
-                .serviceB << {
-                    .throw_before_updating_local = false
-                    .throw_after_updating_local = false
-                    .mrs << {
-                        .throw_on_message_found = true
-                        .throw_after_updating_main_service = false
-                        .throw_before_scheduling_timeout = false
-                    }
-                }
-            }
-
-            setupTest@ServiceA(testScenario)( )
-            setupTest@ServiceB(testScenario)( )
-
-            // Act
-            updateNumber@ServiceA({.username = "user1"})()
-
-            sleep@Time(5000)()
-
-            //Assert
-            query@Database("SELECT * FROM NumbersA")(rowsA)
-            query@Database("SELECT * FROM NumbersB")(rowsB)
-
-            // Since B was never updated, A should be one larger than B
-            println@Console("Expecting A: " + rowsA.row[0].number + " to equal B: " + rowsB.row[0].number)()
-            equals@Assertions({
-                actual = rowsA.row[0].number
-                expected = rowsB.row[0].number + 1
-            })()
-        }]
-
-        [Services_remain_in_sync_when_MRS_throws_after_messaging_B_and_a_single_message_was_sent()(){
-            // Note that the result of this test would be very different if multiple messages were put into kafka before B was initialized.
-            // In such a case, MRS would only forward the first message to B, and the rest would be dropped. Testing this requires me to
-            // Make a Kafka service which allowes for manipulating a desired topic, which is a TODO
-            
-            println@Console("\n\n------------------ Executing 'Services_remain_in_sync_when_MRS_throws_after_messaging_B_and_a_single_message_was_sent' ------------------")()
-            // Arrange:
-            testScenario << {
-                .serviceA << {
-                    .throw_before_updating_local =  false
-                    .throw_before_sending= false
-                    .throw_after_sending = false
-                }
-                .serviceB << {
-                    .throw_before_updating_local = false
-                    .throw_after_updating_local = false
-                    .mrs << {
-                        .throw_on_message_found = false
-                        .throw_after_updating_main_service = true
-                        .throw_before_scheduling_timeout = false
-                    }
-                }
-            }
-
-            setupTest@ServiceA(testScenario)( )
-            setupTest@ServiceB(testScenario)( )
-
-            // Act
-            updateNumber@ServiceA({.username = "user1"})()
-
-            sleep@Time(5000)()
-
-            //Assert
-            query@Database("SELECT * FROM NumbersA")(rowsA)
-            query@Database("SELECT * FROM NumbersB")(rowsB)
-
-            // Since B was never updated, A should be one larger than B
-            println@Console("Expecting A: " + rowsA.row[0].number + " to equal B: " + rowsB.row[0].number)()
-            equals@Assertions({
-                actual = rowsA.row[0].number
-                expected = rowsB.row[0].number
-            })()
-        }]
-
-        // The below test needs to go into its own file, it is very flaky, since it's 'random' whether the MRS crashes before 
-        /*[Services_are_out_of_sync_if_MRS_throws_before_recursing()(){
-            // Note that the result of this test would be very different if multiple messages were put into kafka before B was initialized.
-            // In such a case, MRS would only forward the first message to B, and the rest would be dropped. Testing this requires me to
-            // Make a Kafka service which allowes for manipulating a desired topic, which is a TODO
-            
-            println@Console("\n\n------------------ Executing 'Services_are_out_of_sync_if_MRS_throws_before_recursing' ------------------")()
-            // Arrange:
-            testScenario << {
-                .serviceA << {
-                    .throw_before_updating_local =  false
-                    .throw_before_sending= false
-                    .throw_after_sending = false
-                }
-                .serviceB << {
-                    .throw_before_updating_local = false
-                    .throw_after_updating_local = false
-                    .mrs << {
-                        .throw_on_message_found = false
-                        .throw_after_updating_main_service = false
-                        .throw_before_scheduling_timeout = true
-                    }
-                }
-            }
-
-            setupTest@ServiceA(testScenario)( )
-            setupTest@ServiceB(testScenario)( )
-
-            // Act
-            updateNumber@ServiceA({.username = "user1"})()
-
-            sleep@Time(5000)()
-
-            //Assert
-            query@Database("SELECT * FROM NumbersA")(rowsA)
-            query@Database("SELECT * FROM NumbersB")(rowsB)
-
-            // Since B was never updated, A should be one larger than B
-            println@Console("Expecting A: " + rowsA.row[0].number + " to equal B: " + rowsB.row[0].number)()
-            equals@Assertions({
-                actual = rowsA.row[0].number
-                expected = rowsB.row[0].number + 1
-            })()
-        }]*/
     }
 }

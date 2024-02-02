@@ -57,7 +57,13 @@ service MessageRetrieverService(p: InboxEmbeddingConfig) {
     }
 
     main{
-        [beginReading( req )]{
+        [beginReading()]{
+            // This might be bad code, but catch every exception and retry the call
+            install (default => {
+                scheduleTimeout@Time( 500{
+                operation = "beginReading"
+            } )(  )
+            })
             consumeRequest.timeoutMs = 3000
 
             Consume@KafkaConsumerConnector( consumeRequest )( consumeResponse )

@@ -35,6 +35,9 @@ interface ServiceAFailureInterface {
         /// @Test
         Message_is_delivered_twice_if_MFS_fails_after_reading_message_from_outbox_table(void)(void) throws AssertionError(string),
 
+        /// @Test
+        test1(void)(void) throws AssertionError(string),
+
         /// @AfterEach
         clear_tables(void)(void)
 }
@@ -88,13 +91,12 @@ service ServiceAFailure{
         }]
 
         [clear_tables()(){
-            println@Console("\n\n------------------ Clearing tables for next test ------------------")()
-            sleep@Time(5000)()
+            // Sleep here to avoid having multiple tests manipulating the same dabatase file
+            sleep@Time(1000)()
             println@Console("\n\n------------------ Clearing tables for next test ------------------")()
             update@Database("DELETE FROM numbers WHERE true;")()
             update@Database("DELETE FROM outbox WHERE true;")()
             update@Database("INSERT INTO numbers VALUES('user1', 0);")()
-
         }]
 
         //  -------------- Service A Tests:
@@ -413,6 +415,5 @@ service ServiceAFailure{
                 message = "Expected to recieve 2 messages, but found: " + kafkaResponse.status + " and '" + kafkaResponse2.status + "'"
             })()
         }]
-
     }
 }

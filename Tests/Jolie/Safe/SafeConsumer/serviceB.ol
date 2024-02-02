@@ -31,7 +31,7 @@ service ServiceB{
         // Load the inbox service
         getLocalLocation@Runtime(  )( localLocation )
         loadEmbeddedService@Runtime( { 
-            filepath = "inboxService.ol"
+            filepath = "./SafeConsumer/inboxService.ol"
             params << { 
                 localLocation << localLocation
                 externalLocation << "socket://localhost:8082"
@@ -82,7 +82,7 @@ service ServiceB{
         }]
 
         [setupTest( request )( response ){
-            global.testParams << request.ServiceBTests
+            global.testParams << request.serviceB
             setupTest@InboxService(request.inboxTests)(response)
         }]
     }
