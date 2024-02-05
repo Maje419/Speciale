@@ -1,5 +1,5 @@
 from .simple-kafka-connector import SimpleKafkaConsumerConnector
-from ..test.testTypes import MRSTestParams
+from ..test.testTypes import ProducerTests
 from .inboxTypes import InboxEmbeddingConfig, InboxInterface
 
 from console import Console
@@ -9,7 +9,7 @@ interface MessageRetrieverInterface{
     OneWay: 
         beginReading( void )
     RequestResponse: 
-        setupTest( MRSTestParams )( bool )
+        setupTest( ProducerTests )( bool )
 }
 
 service MessageRetrieverService(p: InboxEmbeddingConfig) {
@@ -65,24 +65,23 @@ service MessageRetrieverService(p: InboxEmbeddingConfig) {
         [beginReading()]{
             // Restart operation if an exception occurs
             install (default => {
-                scheduleTimeout@Time( 500{
+                scheduleTimeout@Time( 10{
                     operation = "beginReading"
-                } )(  )
+            } )(  )
             })
 
             consumeRequest.timeoutMs = 3000
 
             Consume@KafkaConsumerConnector( consumeRequest )( consumeResponse )
 
-            if (global.testParams.throw_after_message_found && !global.hasThrownAfterForMessage){
-                global.hasThrownAfterForMessage = true
-                throw (TestException, "throw_after_message_found")
-            }
-
-            println@Console( "MRS: Received " + #consumeResponse.messages + " messages from KafkaConsumerService" )(  )
 
             for ( i = 0, i < #consumeResponse.messages, i++ ) {
-                println@Console( "MRS: Retrieved message: " + consumeResponse.messages[i].value + " at offset " + consumeResponse.messages[i].offset)( )
+                
+                if (global.testParams.throw_after_message_found && !global.hasThrownAfterForMessage){
+                    global.hasThrownAfterForMessage = true
+                    throw (TestException, "throw_after_message_found")
+                }
+
                 recievedKafkaMessage << consumeResponse.messages[i]
 
                 /**
@@ -97,7 +96,7 @@ service MessageRetrieverService(p: InboxEmbeddingConfig) {
                 */
                 recieveKafka@InboxPort( recievedKafkaMessage )( recievedKafkaMessageResponse )
                 
-                if (global.testParams.throw_after_before_inbox_responds && !global.hasThrownAfterForMessage){
+                if (global.testParams.throw_after_notify_inbox_but_before_commit_to_kafka && !global.hasThrownAfterForMessage){
                     global.hasThrownAfterForMessage = true
                     throw (TestException, "throw_after_message_found")
                 }
@@ -109,13 +108,13 @@ service MessageRetrieverService(p: InboxEmbeddingConfig) {
                 }
             }
 
-            scheduleTimeout@Time( 500{
+            scheduleTimeout@Time( 10{
                 operation = "beginReading"
             } )(  )
         }
 
         [setupTest( request )( response ){
-            global.testParams << request
+            global.testParams << request.mrsTests
             global.hasThrownAfterForMessage = false
             response = true
         }]

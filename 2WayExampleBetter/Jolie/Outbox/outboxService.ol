@@ -55,7 +55,7 @@ service Outbox(p: OutboxSettings){
             install ( SQLException => { println@Console("Error when creating the outbox table for the outbox!")() })
 
             // Varchar size is not enforced by sqlite, we can insert a string of any length
-            createTableRequest = "CREATE TABLE IF NOT EXISTS outbox (kafkaKey VARCHAR(50), kafkaValue VARCHAR (150), mid SERIAL PRIMARY KEY);"
+            createTableRequest = "CREATE TABLE IF NOT EXISTS outbox (kafkaKey TEXT, kafkaValue TEXT, mid SERIAL PRIMARY KEY);"
             update@Database( createTableRequest )( ret )
         }
 

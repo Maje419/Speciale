@@ -25,18 +25,16 @@ type ConsumerTests{
 type ServiceBTests{
     .throw_before_search_inbox*: bool
     .throw_at_inbox_message_found*: bool
-    .throw_after_transaction*: bool
 }
 
 type InboxTestParams{
-    .throw_on_message_found*: bool
     .throw_before_updating_inbox*: bool
     .throw_before_updating_main_service*: bool
 }
 
 type MRSTestParams{
     .throw_after_message_found*: bool
-    .throw_after_before_inbox_responds*: bool
+    .throw_after_notify_inbox_but_before_commit_to_kafka*: bool
 }
 
 type ProducerTests {

@@ -1,4 +1,4 @@
-from ..test.testTypes import InboxTestParams
+from ..test.testTypes import ProducerTests
 
 type KafkaOptions: void {   
     .bootstrapServer: string                   // The URL of the kafka server to connect to, e.g. "localhost:9092"
@@ -36,5 +36,5 @@ type KafkaMessage {
 interface InboxInterface {
     RequestResponse: 
         recieveKafka( KafkaMessage )( string ),
-        setupTest( InboxTestParams )( bool )
+        setupTest( ProducerTests )( bool )
 }

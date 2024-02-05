@@ -69,12 +69,7 @@ service ServiceB{
                 transaction.statement[0] = "INSERT INTO example VALUES (\"" + row.request + "\");"
                 transaction.statement[1] = "UPDATE inbox SET hasBeenRead = true WHERE mid = \"" + row.mid + "\";"
 
-                println@Console(transaction.statement[0])()
-                println@Console(transaction.statement[1])()
                 executeTransaction@Database( transaction )(  )
-                if (global.testParams.throw_after_transaction){
-                    throw ( TestException, "throw_after_transaction" )
-                }
 
             }
             response.code = 200
@@ -83,7 +78,7 @@ service ServiceB{
 
         [setupTest( request )( response ){
             global.testParams << request.serviceB
-            setupTest@InboxService(request.inboxTests)(response)
+            setupTest@InboxService(request)(response)
         }]
     }
 }

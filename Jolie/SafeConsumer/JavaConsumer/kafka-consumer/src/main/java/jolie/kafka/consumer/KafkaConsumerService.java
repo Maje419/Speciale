@@ -6,6 +6,7 @@ import java.util.Properties;
 
 //  Kafka imports
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RebalanceInProgressException;
 import org.apache.kafka.clients.consumer.CommitFailedException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -78,7 +79,14 @@ public class KafkaConsumerService extends JavaService {
             }
         }
 
-        if (records != null) {
+        if (records != null && !records.isEmpty()) {
+            // Since the KafkaConsumer stores internally the offset of the latest message it
+            // has recieved an ack for
+            // we need to do this to 'reset' the offset. This is since we need to read
+            // UNCOMMITTED messages again.
+            TopicPartition par = consumer.assignment().iterator().next();
+            consumer.seek(par, records.iterator().next().offset());
+
             for (ConsumerRecord<String, String> record : records) {
                 Value message = Value.create();
                 message.getFirstChild("offset").setValue(record.offset());
@@ -102,19 +110,19 @@ public class KafkaConsumerService extends JavaService {
     public Value Commit(Value input) {
         Value response = Value.create();
         long offset = input.getFirstChild("offset").longValue() + 1; // +1 since we're committing what the offset of the
+        TopicPartition par = consumer.assignment().iterator().next();
         // NEXT message
         try {
             synchronized (lock) {
                 consumer.commitSync();
+                consumer.seek(par, offset);
             }
             response.getFirstChild("reason").setValue("Committed offset " + offset + " for topic " + topic);
             response.getFirstChild("status").setValue(1);
 
-        } catch (CommitFailedException | RebalanceInProgressException ex) {
-            response.getFirstChild("reason").setValue(ex.getMessage());
-            response.getFirstChild("status").setValue(0);
-        }
 
-        return response;
-    }
+    response.getFirstChild("status").setValue(0);
+}
+
+return response;}
 }

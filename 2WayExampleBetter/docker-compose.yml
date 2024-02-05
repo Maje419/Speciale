@@ -23,7 +23,7 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   db:
-    image: postgres
+    image: maje419/thesis:postgres
     restart: always
     environment:
       POSTGRES_PASSWORD: example

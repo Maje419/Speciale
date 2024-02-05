@@ -67,7 +67,7 @@ service Inbox (p: InboxEmbeddingConfig){
 
     main{
         [recieveKafka( req )( res ) {
-            if (global.testParams.throw_on_message_found && !global.hasThrownAfterForMessage){
+            if (global.testParams.throw_before_updating_inbox && !global.hasThrownAfterForMessage){
                 global.hasThrownAfterForMessage = true
                 throw ( TestException, "throw_on_message_found" )
             }
@@ -85,15 +85,8 @@ service Inbox (p: InboxEmbeddingConfig){
                     // |      'key': 'parameter(s)'|   'false'   |  uuid  |
                     // |——————————————————————————————————————————————————|
                     
-                println@Console("Key: " + req.key + "\nValue: " + req.value)()
-
                 // The Parameters and the mid is stored in a Json string, so construct the object
                 getJsonValue@JsonUtils( req.value )( kafkaValue )
-
-                if (global.testParams.throw_before_updating_inbox && !global.hasThrownAfterForMessage){
-                    global.hasThrownAfterForMessage = true
-                    throw ( TestException, "throw_before_updating_inbox" )
-                }
 
                 update@Database("INSERT INTO inbox (request, hasBeenRead, mid) VALUES (
                     \""+ req.key + ":" + kafkaValue.parameters +        // numbersUpdated:user1
@@ -103,8 +96,7 @@ service Inbox (p: InboxEmbeddingConfig){
             res = "Message stored"
         }] 
         {   
-            if (global.testParams.throw_before_updating_main_service && !global.hasThrownAfterForMessage){
-                global.hasThrownAfterForMessage = true
+            if (global.testParams.throw_before_updating_main_service){
                 throw ( TestException, "throw_before_updating_main_service" )
             }
 
@@ -115,8 +107,8 @@ service Inbox (p: InboxEmbeddingConfig){
 
         [setupTest( request )( response ){
             global.testParams << request.inboxTests
-            global.hasThrownAfterForMessage = true
-            setupTest@MRS( request.mrsTests )( response )
+            global.hasThrownAfterForMessage = false
+            setupTest@MRS( request )( response )
         }]
     }
 }

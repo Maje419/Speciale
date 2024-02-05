@@ -1,8 +1,11 @@
 from .outboxTypes import ForwarderServiceInfo
 from .kafka-inserter import KafkaInserter
+
+from json-utils import JsonUtils
 from time import Time
 from database import Database
 from console import Console
+
 interface MessageForwarderInterface {
     OneWay: startReadingMessages ( ForwarderServiceInfo )
 }
@@ -21,6 +24,7 @@ service MessageForwarderService{
     embed Time as Time
     embed Database as Database
     embed Console as Console
+    embed JsonUtils as JsonUtils
 
     // Starts this service reading continually from the 'outbox' table
     main{
@@ -42,11 +46,18 @@ service MessageForwarderService{
                         kafkaMessage.value = databaseMessage.kafkavalue
                         kafkaMessage.brokerOptions << request.brokerOptions
 
+                        // We need the mid stored in kafka, since we need to ensure each message is only handled once
+                        getJsonString@JsonUtils({
+                            parameters = databaseMessage.kafkavalue, 
+                            mid = databaseMessage.mid
+                        }
+                        )(kafkaMessage.value)
+
                         propagateMessage@KafkaInserter( kafkaMessage )( kafkaResponse )
 
                         println@Console( "Response status: " + kafkaResponse.success )(  )
                         if ( kafkaResponse.success ) {
-                            deleteQuery = "DELETE FROM outbox WHERE  mid = " + databaseMessage.mid
+                            deleteQuery = "DELETE FROM outbox WHERE mid = " + databaseMessage.mid
                             println@Console( "OutboxMessageForwarder: \tExecuting query '" + deleteQuery + "'")(  )
                             update@Database( deleteQuery )( updateResponse )
                         }

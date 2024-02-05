@@ -71,9 +71,9 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                 // If we already have an open transaction for some inbox message,
                 // it might have been lost or some service might have crashed before commiting.
                 // We will abort the transaction and attempt again.
-                if (is_defined(global.openTransactions.(row.kafkaid + ":" + row.messageid)))
+                if (is_defined(global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid)))
                 {
-                    tHandle = global.openTransactions.(row.kafkaid + ":" + row.messageid)
+                    tHandle = global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid)
                     abort@TransactionService( tHandle )( aborted )
                     if ( !aborted )
                     {
@@ -84,14 +84,13 @@ service InboxReaderService (p: InboxEmbeddingConfig){
 
                 // Initialize a new transaction to pass onto Service A
                 initializeTransaction@TransactionService()(tHandle)
-                global.openTransactions.(row.kafkaid + ":" + row.messageid) = tHandle;
+                global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid) = tHandle;
 
                 // Within this new transaction, update the current message as read
                 with( updateRequest )
                 {
                     .handle = tHandle;
-                    .update = "DELETE FROM inbox WHERE " + 
-                            "kafkaId = " + row.kafkaid + 
+                    .update = "DELETE FROM inbox WHERE arrivedFromKafka = " + row.arrivedfromkafka + 
                             " AND messageId = " + row.messageid + ";"
                 }
 
@@ -122,7 +121,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                 {
                     // If some message in the database matches the message in this open transaction,
                     // clearly the trnasaction is not closed yet.
-                    if ( row.kafkaid + ":" + row.messageid == transaction )
+                    if ( row.arrivedfromkafka + ":" + row.messageid == transaction )
                     {
                         transactionIsClosed = false
                     }
