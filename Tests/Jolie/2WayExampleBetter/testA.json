@@ -1,0 +1,11 @@
+{
+  "test": "test/testA",
+  "params": {
+    "ServiceAFailure.ol": [
+      {
+        "name": "ServiceAFailure",
+        "params": {}
+      }
+    ]
+  }
+}

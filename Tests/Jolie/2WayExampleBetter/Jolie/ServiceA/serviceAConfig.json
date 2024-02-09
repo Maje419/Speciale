@@ -1,0 +1,23 @@
+{
+  "serviceAConnectionInfo": {
+    "username": "postgres",
+    "password": "example",
+    "database": "service-a-db",
+    "driver": "postgresql",
+    "host": ""
+  },
+  "pollOptions": {
+    "pollDurationMS": 3000,
+    "pollAmount": 3
+  },
+  "kafkaInboxOptions": {
+    "bootstrapServer": "localhost:29092",
+    "groupId": "service-a-inbox",
+    "topic": "b-out"
+  },
+  "kafkaOutboxOptions": {
+    "bootstrapServer": "localhost:29092",
+    "groupId": "service-a-outbox",
+    "topic": "a-out"
+  }
+}
