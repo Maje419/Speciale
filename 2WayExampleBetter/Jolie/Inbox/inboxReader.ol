@@ -5,12 +5,16 @@ from time import Time
 from console import Console
 
 from .inboxTypes import InboxEmbeddingConfig
-from ..ServiceA.serviceAInterface import ServiceAInterfaceExternal, ServiceAInterfaceLocal
-from ..ServiceB.serviceBInterface import ServiceBInterface
+from ..ServiceA.serviceAInterface import ServiceAInterfaceLocal
 from ..TransactionService.transactionService import TransactionServiceOperations
 
+interface InboxReaderInterface {
+    OneWay: 
+        beginReading
+}
+
 service InboxReaderService (p: InboxEmbeddingConfig){
-    execution: single
+    execution: concurrent
 
     embed Console as Console
     embed Database as Database
@@ -18,13 +22,16 @@ service InboxReaderService (p: InboxEmbeddingConfig){
     embed Reflection as Reflection
     embed Time as Time
 
+    inputPort Self {
+        Location: "local"
+        Interfaces: InboxReaderInterface
+    }
+    
     outputPort Embedder 
     {
         Location: "local"   // Overwritten in init
         Interfaces: 
-            ServiceAInterfaceExternal, 
-            ServiceAInterfaceLocal,
-            ServiceBInterface
+            ServiceAInterfaceLocal
     }
 
     outputPort TransactionService 
@@ -50,22 +57,33 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                 tableCreated = true
             }
         }
+        
+        scheduleTimeout@Time( 10{
+                    operation = "beginReading"
+            } )(  )
+
         println@Console("InboxReader initialized")()
     }
 
     main
     {
-        while (true)
-        {
+        [beginReading()]{
+            install (default => {
+                scheduleTimeout@Time( 1000{
+                    operation = "beginReading"
+                } )(  )
+            })
+
             query@Database("SELECT * FROM inbox;")( queryResponse );
             for ( row in queryResponse.row )
             {
+                println@Console("Handling row: " + row.messageid)()
                 install ( TransactionClosedFault  => 
                     {
                         // This exception is thrown if the query above includes a message whose transaction is
                         // closed before we manage to abort it.
                         // In this case, we don't want to reopen a transaction for said message.
-                        s = 12  // TODO: This is just to have something here
+                        undef (global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid))
                     } )
                 
                 // If we already have an open transaction for some inbox message,
@@ -74,10 +92,13 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                 if (is_defined(global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid)))
                 {
                     tHandle = global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid)
+                    println@Console("Attempting to abort")()
                     abort@TransactionService( tHandle )( aborted )
                     if ( !aborted )
                     {
-                        // TODO: Handle this exception, which happens if the transaction is committed before this abort reaches TS
+                        println@Console("Connection already aborted!")()
+                        // We enter here if the transaction is committed by some other service
+                        // before this abort reaches the transaction service
                         throw ( TransactionClosedFault )
                     }
                 }
@@ -91,7 +112,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                 {
                     .handle = tHandle;
                     .update = "DELETE FROM inbox WHERE arrivedFromKafka = " + row.arrivedfromkafka + 
-                            " AND messageId = " + row.messageid + ";"
+                            " AND messageId = '" + row.messageid + "';"
                 }
 
                 executeUpdate@TransactionService( updateRequest )()
@@ -108,7 +129,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                     .operation = row.operation
                 }
 
-                invoke@Reflection( embedderInvokationRequest )()
+                invokeRRUnsafe@Reflection( embedderInvokationRequest )()
             }
 
             // Now we do some cleanup in the global "opentransaction" variable, just for lolz
@@ -131,10 +152,12 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                     undef( global.openTransactions.transaction )
                 }
             }
+            
+            // Wait for 1 second, then start from begining
+            scheduleTimeout@Time(1000{
+                    operation = "beginReading"
+            } )(  )
 
-            // Sleep for 10 seconds
-            sleep@Time( 10000 )()
         }
-
     }
 }

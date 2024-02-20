@@ -4,7 +4,7 @@ from file import File
 from runtime import Runtime
 from json-utils import JsonUtils
 
-from .serviceAInterface import ServiceAInterfaceExternal, ServiceAInterfaceLocal
+from .serviceAInterface import ServiceAInterfaceLocal
 from ..Outbox.outboxService import OutboxInterface
 from ..TransactionService.transactionService import TransactionService
 
@@ -17,7 +17,7 @@ service ServiceA{
         protocol: http{
             format = "json"
         }
-        interfaces: ServiceAInterfaceLocal, ServiceAInterfaceExternal
+        interfaces: ServiceAInterfaceLocal
     }
 
     // We need to be able to send messages to the Outbox Service to tell it what to put in the outbox
@@ -28,6 +28,7 @@ service ServiceA{
         }
         Interfaces: OutboxInterface
     }
+
     embed File as File
     embed Console as Console
     embed JsonUtils as JsonUtils
@@ -58,7 +59,7 @@ service ServiceA{
         loadEmbeddedService@Runtime({
             filepath = "ServiceA/inboxServiceA.ol"
             params << inboxConfig
-        })()
+        })(InboxService.location)
 
         // Load the outbox service as an embedded service
         loadEmbeddedService@Runtime( {
@@ -97,11 +98,14 @@ service ServiceA{
     main {
         [ updateNumber( req )( res )
         {
-            println@Console("ServiceA: \tUpdateNumber called with username " + req.username)()
+            // If the handle is not defined, the message was recieved from a Jolie service which is not the InboxReader
+            //  We can therefore initiate a new transaction here, and be sure that we're not duplicating an update
+            if (!is_defined(req.handle)){
+                initializeTransaction@TransactionService()(req.handle)
+            }
+
             scope ( UpdateLocalState )    //Update the local state of Service A
             {
-                install ( SQLException => println@Console( "SQL exception occured in Service A while updating local state" )( ) )
-
                 // Check if the user exists, or if it needs to be created
                 with ( userExistsQuery ){
                     .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "';";
@@ -129,9 +133,10 @@ service ServiceA{
 
                 // Parse the request that was supposed to be sent to serviceB into a json string, and enter it into the kafak message.value
                 getJsonString@JsonUtils( {.username = req.username} )(outboxQuery.data)
-
+                
                 updateOutbox@OutboxService( outboxQuery )( updateResponse )
-                res = "Choreography Started!"
+                
+                res = "Choreography Started: " + updateResponse.success
             }
         }]
 

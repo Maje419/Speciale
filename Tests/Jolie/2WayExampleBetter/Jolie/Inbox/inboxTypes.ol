@@ -41,9 +41,9 @@ type MRSEmbeddingConfig {
 
 // ------- InboxWriter Types ---------
 type InboxWriterInsertRequest{
-    .operation: string          // The operation to be called
-    .request*: any {?}          // The request which was to be sent to the operation, as a Jolie structure
-    .id*: int                   // If the message has an ID to make it imdepodent, place it here. Otherwise, it's assigned NULL in the inbox table
+    .operation: string                      // The operation to be called
+    .request*: any {?}                      // The request which was to be sent to the operation, as a Jolie structure
+    .id[0,1] : string | void
 }
 
 //#################### MessageRetrieverService types #######################
@@ -68,8 +68,4 @@ type CommitResponse {
 type InitializeConsumerRequest {
     .pollOptions: PollOptions
     .brokerOptions: KafkaOptions   
-}
-
-interface MessageRetrieverInterface{
-
 }

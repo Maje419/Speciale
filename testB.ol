@@ -2,15 +2,13 @@ include "database.iol"
 include "console.iol"
 
 from .testA import ServiceAInterface
+from time import Time
 from runtime import Runtime
 
-type UR {
-    .name: string
-    .number: int
-}
 
 interface ServiceBInterface {
-    RequestResponse: update( UR )( string )
+    RequestResponse: update( string )( string )
+    OneWay: updateState(int)
 }
 
 type ServiceBProperties{
@@ -35,15 +33,24 @@ service ServiceB(p: ServiceBProperties){
         interfaces: ServiceAInterface
     }
     embed Runtime as Runtime
+    embed Time as Time
 
     init {
-        ServiceA.location = p.serviceALocation
+        ServiceA.location = p.loc
     }
 
     main {
         [update( req ) ( res ){
-            println@Console( "Hello from Service B with name: " + req.name + " and number: " + req.number )(  )
-            res = "Nice"
+            println@Console("Hello from B with state: " + global.p)()
+            scheduleTimeout@Time( 1000{
+                message = req
+                operation = "update"
+            } )( timer )
+            res = "ok"
         }]
+
+        [updateState(request)]{
+            global.p = request
+        }
     }
 }

@@ -3,6 +3,7 @@ from database import Database
 from runtime import Runtime
 from json-utils import JsonUtils
 from reflection import Reflection
+from time import Time
 
 from .inboxTypes import InboxEmbeddingConfig, KafkaMessage, InboxWriterInsertRequest
 
@@ -52,6 +53,7 @@ service InboxWriterService (p: InboxEmbeddingConfig){
     embed Database as Database
     embed JsonUtils as JsonUtils
     embed Runtime as Runtime
+    embed Time as Time
 
     init
     {
@@ -83,13 +85,16 @@ service InboxWriterService (p: InboxEmbeddingConfig){
                 getJsonString@JsonUtils( req.request )( parameters )
 
                 // If an Id is provided, we can assure exactly-once-delivery even at this step
-                if ( is_defined( req.id ))
+                if ( req.request.id instanceof string )
                 {
-                    update@Database("INSERT INTO inbox (operation, parameters, kafkaId, messageId) VALUES ('" + req.operation + "','" + parameters + "', -1, " + req.id + ");")()
+                    update@Database("INSERT INTO inbox (operation, parameters, arrivedFromKafka, messageId) VALUES ('" + req.operation + "','" + inboxRequest + "', false, '" + req.id + "');")()
                 } 
-                else 
+                else // req.request.id instanceof void
                 {
-                    update@Database("INSERT INTO inbox (operation, parameters, kafkaId) VALUES ('" + req.operation + "','" + parameters + "', -1);")()
+                    getProcessId@Runtime( )( processId )
+                    getCurrentTimeMillis@Time()( timeMillis )
+                    messageId = processId + ":" + timeMillis
+                    update@Database("INSERT INTO inbox (operation, parameters, arrivedFromKafka, messageId) VALUES ('" + req.operation + "','" + inboxRequest + "', false, '" + messageId + "');")()
                 }
             }
             res << "Message stored"

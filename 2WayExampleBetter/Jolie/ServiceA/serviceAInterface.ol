@@ -17,6 +17,8 @@ interface ServiceAInterfaceExternal{
 }
 
 interface ServiceAInterfaceLocal{
+    RequestResponse:
+        updateNumber( UpdateNumberRequest )( UpdateNumberResponse )
     OneWay:
         finalizeChoreography( FinalizeChoreographyRequest )
 }

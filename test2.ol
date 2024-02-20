@@ -1,17 +1,40 @@
 from console import Console
+from time import Time
 
-interface TestI {
+interface AInterface {
+  RequestResponse: 
+    setupTest( string )( bool ),
+    op1(void)(void)
+
+  OneWay:
+    op2(bool)
+          
 }
 
-service Test {
-    execution:single
-    
-    embed Console as Console
+service A {
+  execution: concurrent
 
-    main
+  embed Console as Console
+  embed Time as Time
+  
+  inputPort IP {
+    location: "local"
+    interfaces: AInterface
+  }
+
+  main {
+    [op1()()]
     {
-        x = 10 | x = "Hello"
-
-        println@Console()()
+      while(true){
+          println@Console("TestParam: " + global.testParam)()
+          sleep@Time(100)()
+        }
     }
+
+    [setupTest( req )( res ){
+      global.testParam << req
+      println@Console("Setting testparam to: " + req)()
+      res = true
+    }]
+  }
 }

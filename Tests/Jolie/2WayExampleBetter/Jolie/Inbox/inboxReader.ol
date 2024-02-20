@@ -25,8 +25,8 @@ service InboxReaderService (p: InboxEmbeddingConfig){
     inputPort Self {
         Location: "local"
         Interfaces: 
-        InboxReaderInterface,
-        TestInterface
+            InboxReaderInterface,
+            TestInterface
     }
     
     outputPort Embedder 
@@ -69,7 +69,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
     {
         [beginReading()]{
             install (default => {
-                scheduleTimeout@Time( {
+                scheduleTimeout@Time( 1000{
                     operation = "beginReading"
                 } )(  )
             })
@@ -77,12 +77,13 @@ service InboxReaderService (p: InboxEmbeddingConfig){
             query@Database("SELECT * FROM inbox;")( queryResponse );
             for ( row in queryResponse.row )
             {
+                println@Console("Handling row: " + row.messageid)()
                 install ( TransactionClosedFault  => 
                     {
                         // This exception is thrown if the query above includes a message whose transaction is
                         // closed before we manage to abort it.
                         // In this case, we don't want to reopen a transaction for said message.
-                        s = 12  // TODO: This is just to have something here
+                        undef (global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid))
                     } )
                 
                 // If we already have an open transaction for some inbox message,
@@ -90,13 +91,14 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                 // We will abort the transaction and attempt again.
                 if (is_defined(global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid)))
                 {
-                    install(default => println@Console("Caught error trying to abort")())
                     tHandle = global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid)
                     println@Console("Attempting to abort")()
                     abort@TransactionService( tHandle )( aborted )
                     if ( !aborted )
                     {
-                        // TODO: Handle this exception, which happens if the transaction is committed before this abort reaches TS
+                        println@Console("Connection already aborted!")()
+                        // We enter here if the transaction is committed by some other service
+                        // before this abort reaches the transaction service
                         throw ( TransactionClosedFault )
                     }
                 }
@@ -110,7 +112,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                 {
                     .handle = tHandle;
                     .update = "DELETE FROM inbox WHERE arrivedFromKafka = " + row.arrivedfromkafka + 
-                            " AND messageId = " + row.messageid + ";"
+                            " AND messageId = '" + row.messageid + "';"
                 }
 
                 executeUpdate@TransactionService( updateRequest )()
@@ -127,7 +129,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                     .operation = row.operation
                 }
 
-                invoke@Reflection( embedderInvokationRequest )()
+                invokeRRUnsafe@Reflection( embedderInvokationRequest )()
             }
 
             // Now we do some cleanup in the global "opentransaction" variable, just for lolz
@@ -151,7 +153,8 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                 }
             }
             
-            scheduleTimeout@Time(3000{
+            // Wait for 1 second, then start from begining
+            scheduleTimeout@Time(1000{
                     operation = "beginReading"
             } )(  )
 
@@ -159,7 +162,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
 
         [setupTest( request )( response ){
             global.testParams << request.inboxReaderTests
-            global.hasThrownAfterForMessage = false
+            global.hasThrown = false
             response = true
         }]
 

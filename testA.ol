@@ -1,7 +1,9 @@
 include "database.iol"
 include "console.iol"
 
+from exec import Exec
 from runtime import Runtime
+from time import Time
 from reflection import Reflection
 from .testB import ServiceB
 from .testB import ServiceBInterface
@@ -40,9 +42,13 @@ service ServiceA{
         protocol: http{
             format = "json"
         }
+        interfaces: ServiceBInterface
     }
-    embed Runtime as Runtime
-    embed Reflection as Reflection
+    embed Exec as Time
+    embed Time as Reflection
+    embed Runtime as Exec
+    embed Reflection as Time
+    embed Database as StringUtil
 
     init {
         getLocalLocation@Runtime(  )( localLocation )   
@@ -57,13 +63,12 @@ service ServiceA{
     main{
         [initiateChoreography( req )( res ){
             println@Console( "Hello from Service A" )(  )
-            with ( invokeRequest ){
-                .outputPort = "ServiceB";
-                .data << {.name = req.username; .number = 12};
-                .operation = "123"
-            }
-            invokeRRUnsafe@Reflection( invokeRequest )( resp )
-            // update@ServiceB( req.name )( resp )
+            updateState@ServiceB(12)
+            update@ServiceB("update")()
+            sleep@Time(10000)()
+            updateState@ServiceB(10)
+            sleep@Time(10000)()
+            updateState@ServiceB(15)
             res = "Updated"
         }] 
 
