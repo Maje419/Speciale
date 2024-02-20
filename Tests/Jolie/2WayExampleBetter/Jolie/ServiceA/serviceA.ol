@@ -4,10 +4,10 @@ from file import File
 from runtime import Runtime
 from json-utils import JsonUtils
 
-from ...test.testInterface import TestInterface
 from .serviceAInterface import ServiceAInterfaceExternal, ServiceAInterfaceLocal
 from ..Outbox.outboxService import OutboxInterface
 from ..TransactionService.transactionService import TransactionService
+from ...test.testTypes import TestInterface
 
 service ServiceA{
     execution: concurrent
@@ -27,8 +27,17 @@ service ServiceA{
         protocol: http{
             format = "json"
         }
-        Interfaces: OutboxInterface
+        Interfaces: OutboxInterface, TestInterface
     }
+
+    outputPort InboxService {
+        Location: "local"
+        protocol: http{
+            format = "json"
+        }
+        Interfaces: TestInterface
+    }
+
     embed File as File
     embed Console as Console
     embed JsonUtils as JsonUtils
@@ -40,7 +49,7 @@ service ServiceA{
         // serviceAConfig.json contains info for connecting to db, as well as kafka settings
         readFile@File(
             {
-                filename = "ServiceA/serviceAConfig.json"
+                filename = "Jolie/ServiceA/serviceAConfig.json"
                 format = "json"
             }) ( config )
 
@@ -57,13 +66,13 @@ service ServiceA{
         }
 
         loadEmbeddedService@Runtime({
-            filepath = "ServiceA/inboxServiceA.ol"
+            filepath = "Jolie/ServiceA/inboxServiceA.ol"
             params << inboxConfig
-        })()
+        })(InboxService.location)
 
         // Load the outbox service as an embedded service
         loadEmbeddedService@Runtime( {
-            filepath = "Outbox/outboxService.ol"
+            filepath = "Jolie/Outbox/outboxService.ol"
             params << { 
                 pollSettings << config.pollOptions;
                 databaseConnectionInfo << config.serviceAConnectionInfo;
@@ -98,11 +107,18 @@ service ServiceA{
     main {
         [ updateNumber( req )( res )
         {
-            println@Console("ServiceA: \tUpdateNumber called with username " + req.username)()
+            if (global.testParams.throw_on_updateNumber_called){
+                throw ( TestException, "throw_on_updateNumber_called" )
+            }
+
+            // If the handle is not defined, the message was recieved from a Jolie service which is not the InboxReader
+            //  We can therefore initiate a new transaction here, and be sure that we're not duplicating an update
+            if (!is_defined(req.handle)){
+                initializeTransaction@TransactionService()(req.handle)
+            }
+
             scope ( UpdateLocalState )    //Update the local state of Service A
             {
-                install ( SQLException => println@Console( "SQL exception occured in Service A while updating local state" )( ) )
-
                 // Check if the user exists, or if it needs to be created
                 with ( userExistsQuery ){
                     .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "';";
@@ -119,6 +135,10 @@ service ServiceA{
                 }
                 executeUpdate@TransactionService( updateQuery )( updateResponse )
 
+                if (global.testParams.throw_after_local_updates_executed){
+                    throw ( TestException, "throw_after_local_updates_executed" )
+                }
+
                 // To update Service B, this service needs to communicate to its outbox that it should put a message
                 // into kafka containing the operation and the request that we seek to call at                
                 with ( outboxQuery ){
@@ -130,20 +150,37 @@ service ServiceA{
 
                 // Parse the request that was supposed to be sent to serviceB into a json string, and enter it into the kafak message.value
                 getJsonString@JsonUtils( {.username = req.username} )(outboxQuery.data)
-
-                updateOutbox@OutboxService( outboxQuery )( updateResponse )
-                res = "Choreography Started!"
+                
+                scope (HandleOutboxThrow){
+                    install(TestException => {  // I have to install this here, otherwise the tests won't work bcause of the throw
+                        println@Console("updateOutbox threw an exception!")()
+                    })
+                    updateOutbox@OutboxService( outboxQuery )( updateResponse )
+                }
+                res = "Choreography Started: " + updateResponse.success
             }
         }]
 
         [finalizeChoreography( req )]{
+            if (global.testParams.throw_on_finalizeChoreography_called){
+                throw ( TestException, "throw_on_finalizeChoreography_called" )
+            }
+
             commit@TransactionService( req.handle )( result )
+
+            if (global.testParams.throw_after_transaction_committed){
+                throw ( TestException, "throw_after_transaction_committed" )
+            }
+
             println@Console("Finished choreography for user " + req.username)()
         }
 
         [ setupTest( req )( res ){
             global.testParams << req.serviceA
-            res = true
+            setupTest@OutboxService(req)(resOutbox)
+            setupTest@InboxService(req)(resInbox)
+
+            res = (resOutbox && resInbox)
         }]
     }
 }

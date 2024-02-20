@@ -5,6 +5,7 @@ from json-utils import JsonUtils
 from reflection import Reflection
 
 from .inboxTypes import InboxEmbeddingConfig, KafkaMessage, InboxWriterInsertRequest
+from ...test.testTypes import TestInterface
 
 // This interface is used by the MRS to call the InboxWriter when it finds a new message in Kafka
 interface InboxWriterKafkaInterface {               
@@ -14,8 +15,8 @@ interface InboxWriterKafkaInterface {
 
 // This interface can be called by the user to insert a new message in the inbox table
 interface InboxWriterExternalInterface {
-    OneWay:
-        insertIntoInbox( InboxWriterInsertRequest )
+    RequestResponse:
+        insertIntoInbox( InboxWriterInsertRequest )( string )
 }
 
 /**
@@ -36,7 +37,8 @@ service InboxWriterService (p: InboxEmbeddingConfig){
     inputPort InboxInput {
         Location: "local"
         Interfaces: 
-            InboxWriterKafkaInterface
+            InboxWriterKafkaInterface,
+            TestInterface
     }
 
     // This port can be called by an embedder to manually insert a new message
@@ -48,6 +50,11 @@ service InboxWriterService (p: InboxEmbeddingConfig){
         Interfaces: 
             InboxWriterExternalInterface
     }
+
+    outputPort MRS {
+        Location: "local"
+    }
+
     embed Console as Console
     embed Database as Database
     embed JsonUtils as JsonUtils
@@ -69,7 +76,7 @@ service InboxWriterService (p: InboxEmbeddingConfig){
         // Messages from Kafka are read by the MRS service, instantiated here. MRS will forward new messages from Kafka and int this service.
         getLocalLocation@Runtime(  )( localLocation )
         loadEmbeddedService@Runtime({
-            filepath = "Inbox/messageRetrieverService.ol"
+            filepath = "Jolie/Inbox/messageRetrieverService.ol"
             params << 
             { 
                 inboxServiceLocation << localLocation
@@ -82,10 +89,10 @@ service InboxWriterService (p: InboxEmbeddingConfig){
     }
 
     main{
-        [insertIntoInbox( req )]{
+        [insertIntoInbox( req )( res ){
             scope( MakeIdempotent )
             {
-                install( SQLException => println@Console("Message already recieved")() )
+                install( SQLException => res = "Problem inserting the message")
 
                 getJsonString@JsonUtils( req.request )( inboxRequest )
 
@@ -100,7 +107,7 @@ service InboxWriterService (p: InboxEmbeddingConfig){
                 }
             }
             res << "Message stored"
-        }
+        }]
 
         [recieveKafka( req )( res ) 
         {
@@ -114,6 +121,12 @@ service InboxWriterService (p: InboxEmbeddingConfig){
                 update@Database("INSERT INTO inbox (operation, parameters, arrivedFromKafka, messageId) VALUES ('" + req.key + "','" + kafkaValue.parameters + "', true, '" + kafkaValue.mid  + "');")()
             }
             res << "Message stored"
+        }]
+
+        [setupTest( request )( response ){
+            global.testParams << request.inboxWriterTests
+            global.hasThrownAfterForMessage = false
+            response = true
         }]
     }
 }

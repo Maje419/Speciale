@@ -1,9 +1,9 @@
 {
   "test": "test/testA",
   "params": {
-    "ServiceAFailure.ol": [
+    "ServiceAOutbox.ol": [
       {
-        "name": "ServiceAFailure",
+        "name": "ServiceAOutbox",
         "params": {}
       }
     ]

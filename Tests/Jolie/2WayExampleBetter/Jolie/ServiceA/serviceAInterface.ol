@@ -13,7 +13,12 @@ type UpdateNumberResponse: string
 
 interface ServiceAInterfaceExternal{
     RequestResponse:
-        updateNumber( UpdateNumberRequest )( UpdateNumberResponse )
+        updateNumber( UpdateNumberRequest )( UpdateNumberResponse ) throws TestException
+}
+
+interface ServiceAInterfaceLocal{
+    RequestResponse:
+        updateNumber( UpdateNumberRequest )( UpdateNumberResponse ) throws TestException
 }
 
 interface ServiceAInterfaceLocal{

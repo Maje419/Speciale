@@ -5,12 +5,16 @@ from time import Time
 from console import Console
 
 from .inboxTypes import InboxEmbeddingConfig
-from ..ServiceA.serviceAInterface import ServiceAInterfaceExternal, ServiceAInterfaceLocal
-from ..ServiceB.serviceBInterface import ServiceBInterface
 from ..TransactionService.transactionService import TransactionServiceOperations
+from ...test.testTypes import TestInterface
+
+interface InboxReaderInterface {
+    OneWay: 
+        beginReading
+}
 
 service InboxReaderService (p: InboxEmbeddingConfig){
-    execution: single
+    execution: concurrent
 
     embed Console as Console
     embed Database as Database
@@ -18,13 +22,16 @@ service InboxReaderService (p: InboxEmbeddingConfig){
     embed Reflection as Reflection
     embed Time as Time
 
+    inputPort Self {
+        Location: "local"
+        Interfaces: 
+        InboxReaderInterface,
+        TestInterface
+    }
+    
     outputPort Embedder 
     {
         Location: "local"   // Overwritten in init
-        Interfaces: 
-            ServiceAInterfaceExternal, 
-            ServiceAInterfaceLocal,
-            ServiceBInterface
     }
 
     outputPort TransactionService 
@@ -50,13 +57,23 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                 tableCreated = true
             }
         }
+        
+        scheduleTimeout@Time( 10{
+                    operation = "beginReading"
+            } )(  )
+
         println@Console("InboxReader initialized")()
     }
 
     main
     {
-        while (true)
-        {
+        [beginReading()]{
+            install (default => {
+                scheduleTimeout@Time( {
+                    operation = "beginReading"
+                } )(  )
+            })
+
             query@Database("SELECT * FROM inbox;")( queryResponse );
             for ( row in queryResponse.row )
             {
@@ -133,10 +150,18 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                     undef( global.openTransactions.transaction )
                 }
             }
+            
+            scheduleTimeout@Time(3000{
+                    operation = "beginReading"
+            } )(  )
 
-            // Sleep for 10 seconds
-            sleep@Time( 10000 )()
         }
+
+        [setupTest( request )( response ){
+            global.testParams << request.inboxReaderTests
+            global.hasThrownAfterForMessage = false
+            response = true
+        }]
 
     }
 }

@@ -1,10 +1,11 @@
 from runtime import Runtime
 from console import Console
 
+from .serviceAInterface import ServiceAInterfaceExternal, ServiceAInterfaceLocal
 from ..Inbox.inboxTypes import InboxEmbeddingConfig
 from ..Inbox.inboxWriter import InboxWriterService
 from ..Inbox.inboxReader import InboxReaderService
-from .serviceAInterface import ServiceAInterfaceExternal
+from ...test.testTypes import TestInterface
 
 service InboxServiceA (p: InboxEmbeddingConfig){
     execution: concurrent
@@ -15,6 +16,11 @@ service InboxServiceA (p: InboxEmbeddingConfig){
             format = "json"
         }
         Interfaces: ServiceAInterfaceExternal
+    }
+
+    inputPort ServiceALocal {
+        Location: "local"
+        Interfaces: TestInterface
     }
 
     embed Console as Console
@@ -32,8 +38,19 @@ service InboxServiceA (p: InboxEmbeddingConfig){
                 .request << req
             }
 
-            insertIntoInbox@InboxWriter( inboxMessage )
-            res = "Choreography Started!"
+            insertIntoInbox@InboxWriter( inboxMessage )( IWRes )
+            if (IWRes = "Message Stored") {
+                res = "Choreography Started!"
+            } else {
+                res = "Message not received correctly"
+            }
+        }]
+        
+        [setupTest( req )( res ){
+            setupTest@InboxWriter(req)(inboxWriterRes)
+            setupTest@InboxReader(req)(inboxReaderRes)
+
+            res = (inboxWriterRes && inboxReaderRes)
         }]
     }
 }

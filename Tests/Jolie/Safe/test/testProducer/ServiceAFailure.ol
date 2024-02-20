@@ -117,7 +117,7 @@ service ServiceAFailure{
             setupTest@ServiceA(TestCase)()
             
             // Act
-             scope ( ExecuteUpdate ){
+            scope ( ExecuteUpdate ){
                 install( TestException => println@Console("Exception: " + ExecuteUpdate.TestException)() )
                 updateNumber@ServiceA({.username = "user1"})()
             }

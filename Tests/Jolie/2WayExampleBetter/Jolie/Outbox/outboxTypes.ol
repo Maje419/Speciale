@@ -38,12 +38,21 @@ type ColumnSettings {
     .idColumn: string
 }
 
-type ForwarderServiceInfo {
-    .databaseConnectionInfo: ConnectionInfo     // The connectioninfo used to connect to the database. See docs the Database module.
-    .pollSettings: PollSettings                // The settings to use
-    .columnSettings: ColumnSettings            // The names of the columns in the 'outbox' table
+type MFSParams{
+    .databaseConnectionInfo: ConnectionInfo
+    .pollSettings: PollSettings
+    .columnSettings: void{
+        .keyColumn: string
+        .valueColumn: string
+        .idColumn: string
+    }
     .brokerOptions: KafkaOptions
 }
+
+interface MessageForwarderInterface {
+    OneWay: startReadingMessages ( void )
+}
+
 //-------------------- Kafka Inserter Types -----------------//
 type KafkaMessage {
     .topic: string
