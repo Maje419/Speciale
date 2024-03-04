@@ -99,12 +99,13 @@ service ServiceAOutbox{
         }]
 
         [clear_tables()(){
-            // Sleep here to avoid having multiple tests manipulating the same dabatase file
+            // Sleep here to avoid having multiple tests manipulating the same dabatase
             sleep@Time(1000)()
             println@Console("\n\n------------------ Clearing tables for next test ------------------")()
             update@Database("DELETE FROM numbers WHERE true;")()
             update@Database("DELETE FROM inbox WHERE true;")()
             update@Database("DELETE FROM outbox WHERE true;")()
+
         }]
 
         [init_default_testcase()(){
@@ -123,10 +124,23 @@ service ServiceAOutbox{
                     .throw_after_message_found = false
                     .throw_before_commit_to_kafka = false
                 }
+                .inboxService << {
+                    .throw_before_insert = false
+                    .throw_after_insert = false
+                } 
+                .inboxWriterTests << {
+                    .recieve_called_throw_before_update_local = false
+                }
+                .MRS << {
+                    .throw_after_message_found = false
+                    .throw_after_notify_inbox_but_before_commit_to_kafka = false
+                }
             }
         }]
 
         [No_errors_are_thrown_causes_message_into_kafka()(){
+            println@Console("1")()
+
             // Arrange
             setupTest@ServiceA(global.DefaultTestCase)()
 
@@ -152,6 +166,7 @@ service ServiceAOutbox{
         }]
 
         [ServiceA_throws_on_updateNumber_causes_no_kafka_message()(){
+            println@Console("2")()
             // Arrange
             testcase << global.DefaultTestCase
             testcase.serviceA.throw_on_updateNumber_called = true
@@ -174,6 +189,7 @@ service ServiceAOutbox{
         }]
 
         [ServiceA_throws_after_local_transaction_updates_causes_no_kafka_message()(){
+            println@Console("3")()
             // Arrange
             testcase << global.DefaultTestCase
             testcase.serviceA.throw_after_local_updates_executed = true
@@ -195,9 +211,8 @@ service ServiceAOutbox{
             })()
         }]
 
-        // TODO: Write tests for finalizing choreography, E.G reading from Kafka
-
         [OutboxService_throws_upon_called_causes_no_local_update_and_no_kafka_message()(){
+            println@Console("4")()
             
             // Arrange
             testcase << global.DefaultTestCase
@@ -227,11 +242,15 @@ service ServiceAOutbox{
         }]
 
         [OutboxService_throws_after_transaction_committed_results_in_local_update_and_kafka_message()(){
+            println@Console("5")()
+
             // Arrange
             testcase << global.DefaultTestCase
             testcase.outboxService.throw_after_transaction_committed = true
 
             setupTest@ServiceA(testcase)()
+
+            println@Console("HERE!")()
 
             // Act
             install( TestException => println@Console("Exception: " + ExecuteUpdate.TestException)() )
@@ -256,6 +275,8 @@ service ServiceAOutbox{
         }]
 
         [MFS_throw_on_message_found_tries_again_to_forward_same_message()(){
+            println@Console("6")()
+
             // Arrange
             testcase << global.DefaultTestCase
             testcase.MFS.throw_after_message_found = true
@@ -285,6 +306,8 @@ service ServiceAOutbox{
         }]
     
         [MFS_throw_before_commit_to_kafka_results_in_message_sent_twice()(){
+                println@Console("7")()
+            
                 // Arrange
                 testcase << global.DefaultTestCase
                 testcase.MFS.throw_before_commit_to_kafka = true

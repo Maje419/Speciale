@@ -127,6 +127,7 @@ service Outbox(p: OutboxSettings){
         }]
 
         [setupTest(req)(res){
+            println@Console("Setuptests OutboxService")()
             global.testParams << req.outboxService
             setupTest@MFS(req)(res)
         }]

@@ -178,6 +178,7 @@ service ServiceA{
         [ setupTest( req )( res ){
             global.testParams << req.serviceA
             setupTest@OutboxService(req)(resOutbox)
+            println@Console("ResOutbox: " + resOutbox)()
             setupTest@InboxService(req)(resInbox)
 
             res = (resOutbox && resInbox)

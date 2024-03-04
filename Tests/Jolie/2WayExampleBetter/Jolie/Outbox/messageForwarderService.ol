@@ -71,6 +71,8 @@ service MessageForwarderService(p: MFSParams){
                     }
                     )(kafkaMessage.value)
 
+                    println@Console("jsonstring: " + kafkaMessage.value)()
+
                     propagateMessage@KafkaInserter( kafkaMessage )( kafkaResponse )
 
                     if (global.testParams.throw_before_commit_to_kafka && !global.hasThrown){
@@ -92,6 +94,8 @@ service MessageForwarderService(p: MFSParams){
         }
 
         [setupTest(req)(res){
+            println@Console("Setuptests MFS")()
+
             global.testParams << req.MFS
             global.hasThrown = false
             res = true

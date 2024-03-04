@@ -19,6 +19,9 @@ interface ServiceAInboxInterface {
         /// @BeforeAll
         init_default_testcase(void)(void),
 
+        /// @Test
+        MRS_throws_on_message_found_does_not_desync(void)(void),
+
         /// @AfterEach
         clear_tables(void)(void)
 }
@@ -56,6 +59,8 @@ service ServiceAInbox{
                 filename = "Jolie/ServiceA/serviceAConfig.json"
                 format = "json"
             }) ( config )
+
+            global.config << config
 
             connect@Database(config.serviceAConnectionInfo)()
 
@@ -102,8 +107,54 @@ service ServiceAInbox{
                     .throw_after_message_found = false
                     .throw_before_commit_to_kafka = false
                 }
+                .inboxService << {
+                    .throw_before_insert = false
+                    .throw_after_insert = false
+                } 
+                .inboxWriterTests << {
+                    .recieve_called_throw_before_update_local = false
+                }
+                .MRS << {
+                    .throw_after_message_found = false
+                    .throw_after_notify_inbox_but_before_commit_to_kafka = false
+                }
             }
         }]
 
+        [MRS_throws_on_message_found_does_not_desync()(){
+            // Arrange
+            testCase << global.DefaultTestCase
+            testCase.MRS.throw_after_message_found = true
+
+            setupTest@ServiceA( testCase )( response)
+
+            // Act
+            insertMessageFromB
+
+            sleep@Time(10000)()
+
+            // Assert
+
+        }]
+    }
+
+    define insertMessageFromB
+    {   
+        jsonValue << {
+            .mid = "803:1709557365584"
+            .parameters << {
+                .username = "user1"
+            }
+        }
+        getJsonString@JsonUtils(jsonValue)(jsonString)
+
+        kafkaMessage.topic = global.config.kafkaInboxOptions.topic        // "b-out"
+        kafkaMessage.key = "updateNumber"                           // key is the operation
+        kafkaMessage.value = jsonString                             // See above
+
+        send@KafkaTestTool(kafkaMessage)( testToolResponse )
+
+        println@Console("KafkaTestTool SendResponse: " + testToolResponse.status )()
+        
     }
 }

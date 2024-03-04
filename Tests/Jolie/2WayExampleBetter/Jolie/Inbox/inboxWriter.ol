@@ -53,7 +53,8 @@ service InboxWriterService (p: InboxEmbeddingConfig){
     }
 
     outputPort MRS {
-        Location: "local"
+        Location: "local"       // Overwritten in init
+        Interfaces: TestInterface
     }
 
     embed Console as Console
@@ -85,9 +86,10 @@ service InboxWriterService (p: InboxEmbeddingConfig){
                 kafkaPollOptions << p.kafkaPollOptions
                 kafkaInboxOptions << p.kafkaInboxOptions
             }
-        })( )
+        })( MRS.location )
         
         println@Console( "InboxWriter Initialized at location '" + localLocation + "'" )( )
+        println@Console( "MRS Initialized at location '" + MRS.location + "'" )( )
     }
 
     main{
@@ -138,9 +140,11 @@ service InboxWriterService (p: InboxEmbeddingConfig){
         }]
 
         [setupTest( request )( response ){
+            println@Console("InboxWriter tests")()
+
             global.testParams << request.inboxWriterTests
             global.hasThrown = false
-            response = true
+            setupTest@MRS(request)(response)
         }]
     }
 }

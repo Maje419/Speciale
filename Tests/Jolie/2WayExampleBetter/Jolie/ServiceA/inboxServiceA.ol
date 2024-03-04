@@ -35,16 +35,16 @@ service InboxServiceA (p: InboxEmbeddingConfig){
             with( inboxMessage )
             {
                 .operation = "updateNumber";
-                .request << req;
+                .request << req
             }
 
-            if (global.throw_before_insert){
+            if (global.testParams.throw_before_insert){
                 throw (TestException, "throw_before_insert")
             }
 
             insertIntoInbox@InboxWriter( inboxMessage )( IWRes )
 
-            if (global.throw_after_insert){
+            if (global.testParams.throw_after_insert){
                 throw (TestException, "throw_after_insert")
             }
 
@@ -56,6 +56,7 @@ service InboxServiceA (p: InboxEmbeddingConfig){
         }]
         
         [setupTest( req )( res ){
+            println@Console("InboxServiceA tests")()
             global.testParams << req.inboxService
             setupTest@InboxWriter(req)(inboxWriterRes)
             setupTest@InboxReader(req)(inboxReaderRes)

@@ -18,6 +18,8 @@ interface MessageRetrieverInterface{
 }
 
 service MessageRetriever(p: MRSEmbeddingConfig) {
+    execution: concurrent
+    
     // This port is used to notify the inbox service of new messages
     outputPort InboxWriter {
         location: "local"
@@ -76,9 +78,21 @@ service MessageRetriever(p: MRSEmbeddingConfig) {
             // exactly-once-delivery
             for ( i = 0, i < #consumeResponse.messages, i++ ) 
             {
+                if (global.testParams.throw_after_message_found && !global.hasThrownAfterForMessage){
+                    println@Console("MRS Threw exception: " + "throw_after_message_found")()
+                    global.hasThrownAfterForMessage = true
+                    throw (TestException, "throw_after_message_found")
+                }
+
                 println@Console( "InboxService: Retrieved message: " + consumeResponse.messages[i].value + " at offset " + consumeResponse.messages[i].offset)( )
                 recievedKafkaMessage << consumeResponse.messages[i]
                 recieveKafka@InboxWriter( recievedKafkaMessage )( recievedKafkaMessageResponse )
+
+                if (global.testParams.throw_after_notify_inbox_but_before_commit_to_kafka && !global.hasThrownAfterForMessage){
+                    global.hasThrownAfterForMessage = true
+                    throw (TestException, "throw_after_message_found")
+                }
+
                 if ( recievedKafkaMessageResponse == "Message stored" ||
                     recievedKafkaMessageResponse == "Message already recieved, please re-commit" )
                 {
@@ -93,7 +107,9 @@ service MessageRetriever(p: MRSEmbeddingConfig) {
         }
 
         [setupTest( request )( response ){
-            global.testParams << request.mrsTests
+            println@Console("MRS tests")()
+
+            global.testParams << request.MRS
             global.hasThrownAfterForMessage = false
             response = true
         }]

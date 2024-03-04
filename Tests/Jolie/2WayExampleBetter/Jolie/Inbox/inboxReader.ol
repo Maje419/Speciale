@@ -161,6 +161,8 @@ service InboxReaderService (p: InboxEmbeddingConfig){
         }
 
         [setupTest( request )( response ){
+            println@Console("InboxReader tests")()
+
             global.testParams << request.inboxReaderTests
             global.hasThrown = false
             response = true

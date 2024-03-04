@@ -1,7 +1,8 @@
 {
   "scripts": {
     "testAll": "jot testAllA.json",
-    "testAOutbox": "jot testA.json"
+    "testAOutbox": "jot testAOutbox.json",
+    "testAInbox": "jot testAInbox.json"
   },
   "dependencies": {
     "@jolie/jot": "^0.0.25"

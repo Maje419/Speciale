@@ -1,0 +1,11 @@
+{
+  "test": "test/testInboxA",
+  "params": {
+    "ServiceAOutbox.ol": [
+      {
+        "name": "ServiceAInbox",
+        "params": {}
+      }
+    ]
+  }
+}
