@@ -83,8 +83,9 @@ service MessageRetriever(p: MRSEmbeddingConfig) {
                     global.hasThrownAfterForMessage = true
                     throw (TestException, "throw_after_message_found")
                 }
+                
 
-                println@Console( "InboxService: Retrieved message: " + consumeResponse.messages[i].value + " at offset " + consumeResponse.messages[i].offset)( )
+                println@Console( "MRS: Retrieved message: " + consumeResponse.messages[i].value + " at offset " + consumeResponse.messages[i].offset)( )
                 recievedKafkaMessage << consumeResponse.messages[i]
                 recieveKafka@InboxWriter( recievedKafkaMessage )( recievedKafkaMessageResponse )
 

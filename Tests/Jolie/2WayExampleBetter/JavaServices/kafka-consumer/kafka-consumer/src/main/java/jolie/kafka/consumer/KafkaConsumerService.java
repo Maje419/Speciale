@@ -76,8 +76,7 @@ public class KafkaConsumerService extends JavaService {
         // We need to do this stupid stuff, because the consumer otherwise uses its
         // locally stored
         // offset when polling for new messages, and this could cause some message to
-        // not get handled at
-        // allJavaServices/kafka-consumer/kafka-consumer/target/kafka-consumer-1.0-SNAPSHOT.jar
+        // not get handled at all
         // if it's lost after leaving this consumer service.
         try {
             Set<TopicPartition> pars = consumer.assignment();
@@ -119,7 +118,6 @@ public class KafkaConsumerService extends JavaService {
      */
 
     public Value commit(Value input) {
-        System.out.println("\n\n COMMIT CALLED \n\n");
         Value response = Value.create();
         long offset = input.getFirstChild("offset").longValue() + 1; // +1 since we're committing what the offset of the
                                                                      // NEXT message

@@ -69,6 +69,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
     {
         [beginReading()]{
             install (default => {
+                println@Console("Caught some default exception!")()
                 scheduleTimeout@Time( 1000{
                     operation = "beginReading"
                 } )(  )
@@ -83,7 +84,8 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                         // This exception is thrown if the query above includes a message whose transaction is
                         // closed before we manage to abort it.
                         // In this case, we don't want to reopen a transaction for said message.
-                        undef (global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid))
+                        println@Console("TransactionClosedFault thrown")()
+                        undef(global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid))
                     } )
                 
                 // If we already have an open transaction for some inbox message,
@@ -94,6 +96,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                     tHandle = global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid)
                     println@Console("Attempting to abort")()
                     abort@TransactionService( tHandle )( aborted )
+                    println@Console("Got here!")()
                     if ( !aborted )
                     {
                         println@Console("Connection already aborted!")()
@@ -101,13 +104,16 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                         // before this abort reaches the transaction service
                         throw ( TransactionClosedFault )
                     }
+                    undef(global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid))
                 }
 
+                println@Console("Got here!")()
                 // Initialize a new transaction to pass onto Service A
                 initializeTransaction@TransactionService()(tHandle)
                 global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid) = tHandle;
 
                 // Within this new transaction, update the current message as read
+                // TODO: Remember that this query will fail 
                 with( updateRequest )
                 {
                     .handle = tHandle;

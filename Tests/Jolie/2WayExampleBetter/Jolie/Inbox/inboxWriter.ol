@@ -127,13 +127,15 @@ service InboxWriterService (p: InboxEmbeddingConfig){
 
                 getJsonValue@JsonUtils( req.value )( kafkaValue )
 
+                getJsonString@JsonUtils(kafkaValue.parameters)(parametersString)
+
                 if (global.testParams.recieve_called_throw_before_update_local){
                     global.hasThrown = true
                     throw (TestException, "recieve_called_throw_before_update_local")
                 }
                 
                 // As per protocol, the key will be the operation, and the value a string containing the request. 
-                update@Database("INSERT INTO inbox (operation, parameters, arrivedFromKafka, messageId) VALUES ('" + req.key + "','" + kafkaValue.parameters + "', true, '" + kafkaValue.mid  + "');")()
+                update@Database("INSERT INTO inbox (operation, parameters, arrivedFromKafka, messageId) VALUES ('" + req.key + "','" + parametersString + "', true, '" + kafkaValue.mid  + "');")()
                 
                 res = "Message stored"
             }

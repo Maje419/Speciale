@@ -9,7 +9,7 @@ from ..TransactionService.transactionService import TransactionServiceOperations
 from ...test.testTypes import TestInterface
 
 interface InboxReaderInterface {
-    OneWay: 
+    OneWay:
         beginReading
 }
 
@@ -24,17 +24,17 @@ service InboxReaderService (p: InboxEmbeddingConfig){
 
     inputPort Self {
         Location: "local"
-        Interfaces: 
+        Interfaces:
             InboxReaderInterface,
             TestInterface
     }
-    
-    outputPort Embedder 
+
+    outputPort Embedder
     {
         Location: "local"   // Overwritten in init
     }
 
-    outputPort TransactionService 
+    outputPort TransactionService
     {
         Location: "local"   // Overwritten in init
         Protocol: http{
@@ -43,7 +43,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
         Interfaces: TransactionServiceOperations
     }
 
-    init 
+    init
     {
         // This service will forward calls to its embedder service from the inbox
         Embedder.location << p.localLocation
@@ -57,7 +57,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                 tableCreated = true
             }
         }
-        
+
         scheduleTimeout@Time( 10{
                     operation = "beginReading"
             } )(  )
@@ -69,6 +69,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
     {
         [beginReading()]{
             install (default => {
+                println@Console("Default exception caught")()
                 scheduleTimeout@Time( 1000{
                     operation = "beginReading"
                 } )(  )
@@ -78,14 +79,15 @@ service InboxReaderService (p: InboxEmbeddingConfig){
             for ( row in queryResponse.row )
             {
                 println@Console("Handling row: " + row.messageid)()
-                install ( TransactionClosedFault  => 
+                install ( TransactionClosedFault  =>
                     {
                         // This exception is thrown if the query above includes a message whose transaction is
                         // closed before we manage to abort it.
                         // In this case, we don't want to reopen a transaction for said message.
-                        undef (global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid))
+                        println@Console("TransactionClosedFault caught")()
+                        undef(global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid))
                     } )
-                
+
                 // If we already have an open transaction for some inbox message,
                 // it might have been lost or some service might have crashed before commiting.
                 // We will abort the transaction and attempt again.
@@ -100,6 +102,8 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                         // We enter here if the transaction is committed by some other service
                         // before this abort reaches the transaction service
                         throw ( TransactionClosedFault )
+                    } else {
+                        undef(global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid))
                     }
                 }
 
@@ -111,12 +115,12 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                 with( updateRequest )
                 {
                     .handle = tHandle;
-                    .update = "DELETE FROM inbox WHERE arrivedFromKafka = " + row.arrivedfromkafka + 
+                    .update = "DELETE FROM inbox WHERE arrivedFromKafka = " + row.arrivedfromkafka +
                             " AND messageId = '" + row.messageid + "';"
                 }
 
                 executeUpdate@TransactionService( updateRequest )()
-                
+
                 // The operation request is stored in the "parameters" column
                 getJsonValue@JsonUtils( row.parameters )( parameters )
                 parameters.handle = tHandle
@@ -152,7 +156,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                     undef( global.openTransactions.transaction )
                 }
             }
-            
+
             // Wait for 1 second, then start from begining
             scheduleTimeout@Time(1000{
                     operation = "beginReading"

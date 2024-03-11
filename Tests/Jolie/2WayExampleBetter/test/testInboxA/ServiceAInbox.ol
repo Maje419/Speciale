@@ -126,15 +126,21 @@ service ServiceAInbox{
             testCase << global.DefaultTestCase
             testCase.MRS.throw_after_message_found = true
 
-            setupTest@ServiceA( testCase )( response)
+            setupTest@ServiceA( testCase )( response )
+            sleep@Time(100)()
 
             // Act
             insertMessageFromB
-
             sleep@Time(10000)()
 
             // Assert
-
+            // We expect the user 'user1' to have been inserted into the empty numbers table
+            query@Database("SELECT * FROM numbers WHERE username = 'user1'")( rows )
+            equals@Assertions({
+                expected = 1
+                actual = #rows.row
+                message = "Expected to find 1 user, but found" + #rows.row
+            })()
         }]
     }
 
@@ -146,7 +152,9 @@ service ServiceAInbox{
                 .username = "user1"
             }
         }
+
         getJsonString@JsonUtils(jsonValue)(jsonString)
+        println@Console("Inserting jsonString: " + jsonString)()
 
         kafkaMessage.topic = global.config.kafkaInboxOptions.topic        // "b-out"
         kafkaMessage.key = "updateNumber"                           // key is the operation
