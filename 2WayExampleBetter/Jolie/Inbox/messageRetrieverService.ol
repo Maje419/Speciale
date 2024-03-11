@@ -16,6 +16,7 @@ interface MessageRetrieverInterface{
 }
 
 service MessageRetriever(p: MRSEmbeddingConfig) {
+    execution: concurrent
     // This port is used to notify the inbox service of new messages
     outputPort InboxWriter {
         location: "local"

@@ -78,13 +78,11 @@ service InboxReaderService (p: InboxEmbeddingConfig){
             query@Database("SELECT * FROM inbox;")( queryResponse );
             for ( row in queryResponse.row )
             {
-                println@Console("Handling row: " + row.messageid)()
                 install ( TransactionClosedFault  => 
                     {
                         // This exception is thrown if the query above includes a message whose transaction is
                         // closed before we manage to abort it.
                         // In this case, we don't want to reopen a transaction for said message.
-                        println@Console("TransactionClosedFault thrown")()
                         undef(global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid))
                     } )
                 
@@ -94,12 +92,9 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                 if (is_defined(global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid)))
                 {
                     tHandle = global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid)
-                    println@Console("Attempting to abort")()
                     abort@TransactionService( tHandle )( aborted )
-                    println@Console("Got here!")()
                     if ( !aborted )
                     {
-                        println@Console("Connection already aborted!")()
                         // We enter here if the transaction is committed by some other service
                         // before this abort reaches the transaction service
                         throw ( TransactionClosedFault )
@@ -107,7 +102,6 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                     undef(global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid))
                 }
 
-                println@Console("Got here!")()
                 // Initialize a new transaction to pass onto Service A
                 initializeTransaction@TransactionService()(tHandle)
                 global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid) = tHandle;
@@ -125,6 +119,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                 
                 // The operation request is stored in the "parameters" column
                 getJsonValue@JsonUtils( row.parameters )( parameters )
+                println@Console("Parameters username: " + parameters.username)()
                 parameters.handle = tHandle
 
                 // Call the corresponding operation at the embedder service

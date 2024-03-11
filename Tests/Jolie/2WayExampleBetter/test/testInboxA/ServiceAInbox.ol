@@ -148,7 +148,7 @@ service ServiceAInbox{
     {   
         jsonValue << {
             .mid = "803:1709557365584"
-            .parameters << {
+            .parameters << {    // TODO: Figure out why this becomes null in tests
                 .username = "user1"
             }
         }

@@ -255,8 +255,6 @@ public class TransactionService extends JavaService {
     }
 
     public boolean abort(String transactionHandle) throws FaultException {
-        System.out.println("Transactionservice: Aborting");
-        
         try {
             System.out.println("Transactionservice: Aborting transaction");
             synchronized (m_commitAbortLock) {

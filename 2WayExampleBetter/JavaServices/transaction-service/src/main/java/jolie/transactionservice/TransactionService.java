@@ -202,7 +202,6 @@ public class TransactionService extends JavaService {
     }
 
     public Value executeUpdate(Value input) throws FaultException {
-        System.out.println("Transactionservice: Executing update");
         String transactionHandle = input.getFirstChild("handle").strValue();
         String query = input.getFirstChild("update").strValue();
 
@@ -220,7 +219,6 @@ public class TransactionService extends JavaService {
             int numberRowsUpdated = statement.executeUpdate();
             // Return the number of rows affected by the update
             response.setValue(numberRowsUpdated);
-            System.out.println("Transactionservice: Executed update");
             return response;
         } catch (SQLException e) {
             System.out.println("Query: '" + query + "' failed");
@@ -229,7 +227,6 @@ public class TransactionService extends JavaService {
     }
 
     public Value commit(String transactionHandle) throws FaultException {
-        System.out.println("Transactionservice: Committing transaction");
         Value response = Value.create();
 
         try {
@@ -255,10 +252,8 @@ public class TransactionService extends JavaService {
     }
 
     public boolean abort(String transactionHandle) throws FaultException {
-        System.out.println("Transactionservice: Abort called");
         try {
             Connection con;
-            System.out.println("Transactionservice: Aborting transaction");
             synchronized (m_commitAbortLock) {
                 con = m_openTransactions.get(transactionHandle);
 
@@ -270,7 +265,6 @@ public class TransactionService extends JavaService {
                 con.rollback();
                 con.close();
                 m_openTransactions.remove(transactionHandle);
-                System.out.println("Transactionservice: Transaction aborted");
                 return con.isClosed();
             }
         } catch (SQLException e) {
