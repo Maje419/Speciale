@@ -5,7 +5,7 @@ from json-utils import JsonUtils
 from reflection import Reflection
 from time import Time
 
-from .inboxTypes import InboxEmbeddingConfig, KafkaMessage, InboxWriterInsertRequest
+from .inboxTypes import InboxConfig, KafkaMessage, InboxWriterInsertRequest
 
 // This interface is used by the MRS to call the InboxWriter when it finds a new message in Kafka
 interface InboxWriterKafkaInterface {               
@@ -30,7 +30,7 @@ interface InboxWriterExternalInterface {
 *           |     "finalizeChor"   |  {"username":"user3"} |           F         |    42       |
 *           |——————————————————————|———————————————————————|—————————————————————|—————————————|
 */
-service InboxWriterService (p: InboxEmbeddingConfig){
+service InboxWriterService (p: InboxConfig){
     execution: concurrent
 
     // Used for MRS to talk with the inbox
@@ -124,6 +124,7 @@ service InboxWriterService (p: InboxEmbeddingConfig){
                 update@Database("INSERT INTO inbox (operation, parameters, arrivedFromKafka, messageId) VALUES ('" + req.key + "','" + kafkaValue.parameters + "', true, '" + kafkaValue.mid  + "');")()
                 
                 res = "Message stored"
+                println@Console("InboxWriter returned " + res)()
             }
         }]
     }

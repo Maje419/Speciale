@@ -24,8 +24,9 @@ type KafkaMessage {
 }
 
 //#################### InboxService types #######################
-type InboxEmbeddingConfig: void {
+type InboxConfig: void {
     .localLocation: any
+    .ibobLocation[0,1]: any
     .externalLocation[0,1]: string
     .databaseConnectionInfo : any {?}    // This should really be of type ConnectionInfo, but cannot make it work with imports
     .transactionServiceLocation: any
@@ -39,7 +40,12 @@ type MRSEmbeddingConfig {
     .kafkaInboxOptions: KafkaOptions
 }
 
+
+// ------- InboxReader Types ---------
+
+
 // ------- InboxWriter Types ---------
+
 type InboxWriterInsertRequest{
     .operation: string                      // The operation to be called
     .request*: any {?}                      // The request which was to be sent to the operation, as a Jolie structure

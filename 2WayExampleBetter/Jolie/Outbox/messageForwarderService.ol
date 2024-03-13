@@ -1,10 +1,15 @@
-from .outboxTypes import MFSParams, MessageForwarderInterface
+from .outboxTypes import MFSParams
 from .kafka-inserter import KafkaInserter
 
 from json-utils import JsonUtils
 from time import Time
 from database import Database
 from console import Console
+
+
+interface MessageForwarderInterface {
+    RequestResponse: startReadingMessages ( void )(void )
+}
 
 /**
 * This service is responsible for reading messages from the 'outbox' table, forwarding them to Kafaka, 
@@ -30,17 +35,16 @@ service MessageForwarderService(p: MFSParams){
         connect@Database( p.databaseConnectionInfo )( void )
         println@Console( "OutboxMessageForwarder Initialized" )(  )
 
-        scheduleTimeout@Time( 20{
+        scheduleTimeout@Time( 1000{
                 operation = "startReadingMessages"
         } )(  )
     }
 
     main{
-        [startReadingMessages()] 
-        {
+        [startReadingMessages()(){
             install (default => {
                 println@Console("MFS: caught some error")()
-                scheduleTimeout@Time( 20{
+                scheduleTimeout@Time( 1000{
                     operation = "startReadingMessages"
                 } )(  )
             })
@@ -74,9 +78,9 @@ service MessageForwarderService(p: MFSParams){
                     }
                 }
             }
-            scheduleTimeout@Time( 20{
+            scheduleTimeout@Time( 1000{
                 operation = "startReadingMessages"
             } )(  )
-        }
+        }] 
     }
 }

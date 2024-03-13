@@ -1,5 +1,5 @@
 
-from .outboxTypes import OutboxSettings, UpdateOutboxRequest, StatusResponse
+from .outboxTypes import OutboxConfig, UpdateOutboxRequest, StatusResponse
 from .messageForwarderService import MessageForwarderInterface
 from ..TransactionService.transactionService import TransactionServiceOperations
 
@@ -18,7 +18,7 @@ interface OutboxInterface{
 * This service is used to implement the outbox pattern. Given an SQL query and some message, it will atomically execute the query, as well write the message to a messages table.
 * It will then embeds a 'RelayService', which reads from the 'Messages' table and forwards messages into Kafka.
 */
-service Outbox(p: OutboxSettings){
+service OutboxService(p: OutboxConfig){
     execution: concurrent
     inputPort OutboxPort {
         Location: "local"
@@ -99,14 +99,9 @@ service Outbox(p: OutboxSettings){
             }
 
             executeUpdate@TransactionService( updateRequest )( updateResponse )
-            if ( req.commitTransaction ){
-                commit@TransactionService( req.tHandle )()
-                res.message = "Transaction executed sucessfully"
-                res.success = true 
-            } else {
-                res.message = "Update could not be executed"
-                res.success = false
-            }
+            
+            res.message = "Outbox updated"
+            res.success = true
         }]
     }
 }

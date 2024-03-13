@@ -20,8 +20,8 @@ service ServiceA{
         interfaces: ServiceAInterfaceLocal
     }
 
-    // We need to be able to send messages to the Outbox Service to tell it what to put in the outbox
-    outputPort OutboxService {
+    // This service is responsible for 
+    outputPort IBOB {
         Location: "local"
         protocol: http{
             format = "json"
@@ -56,24 +56,28 @@ service ServiceA{
             .kafkaInboxOptions << config.kafkaInboxOptions
         }
 
+        with ( outboxConfig ){
+            .pollSettings << config.pollOptions;
+            .databaseConnectionInfo << config.serviceAConnectionInfo;
+            .brokerOptions << config.kafkaOutboxOptions;
+            .transactionServiceLocation << TransactionService.location
+        }
+
+
+        loadEmbeddedService@Runtime({
+            filepath = "InboxOutbox/ibob.ol"
+            params << { 
+                .inboxConfig << inboxConfig;
+                .outboxConfig << outboxConfig
+                }
+        })(IBOB.location)
+
+        inboxConfig.ibobLocation = IBOB.location
         loadEmbeddedService@Runtime({
             filepath = "ServiceA/inboxServiceA.ol"
             params << inboxConfig
         })(InboxService.location)
-
-        // Load the outbox service as an embedded service
-        loadEmbeddedService@Runtime( {
-            filepath = "Outbox/outboxService.ol"
-            params << { 
-                pollSettings << config.pollOptions;
-                databaseConnectionInfo << config.serviceAConnectionInfo;
-                brokerOptions << config.kafkaOutboxOptions;
-                transactionServiceLocation << TransactionService.location
-            }
-        } )( OutboxService.location )    // It is very important that this is a lower-case 'location', otherwise it doesn't work
-                                        // Guess how long it took me to figure that out :)
-        
-        
+                
         // Connect the TransactionService to the database 
         connect@TransactionService( config.serviceAConnectionInfo )( void )
 
@@ -134,14 +138,13 @@ service ServiceA{
                 // Parse the request that was supposed to be sent to serviceB into a json string, and enter it into the kafak message.value
                 getJsonString@JsonUtils( {.username = req.username} )(outboxQuery.data)
                 
-                updateOutbox@OutboxService( outboxQuery )( updateResponse )
+                updateOutbox@IBOB( outboxQuery )( updateResponse )
                 
                 res = "Choreography Started: " + updateResponse.success
             }
         }]
 
         [finalizeChoreography( req )]{
-            commit@TransactionService( req.handle )( result )
             println@Console("Finished choreography for user " + req.username)()
         }
     }

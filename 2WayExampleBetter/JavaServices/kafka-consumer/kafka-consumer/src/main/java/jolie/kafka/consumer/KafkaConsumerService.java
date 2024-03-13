@@ -66,6 +66,7 @@ public class KafkaConsumerService extends JavaService {
      *              response form Kafka
      */
     public Value consume(Value input) {
+        System.out.println("KafkaConsumer: Consume called");
         long timeout = input.getFirstChild("timeoutMs").longValue();
         ConsumerRecords<String, String> records = null;
 
@@ -112,17 +113,21 @@ public class KafkaConsumerService extends JavaService {
         Value response = Value.create();
         long offset = input.getFirstChild("offset").longValue() + 1; // +1 since we're committing what the offset of the
                                                                      // NEXT message
+
+        System.out.println("KafkaConsumer: Commit called for offset" + offset);
         TopicPartition par = consumer.assignment().iterator().next();
         try {
             synchronized (lock) {
-                consumer.commitSync();
                 // This seek is needed, since the consumer would otherwise try reading the
                 // already committed message on next poll
                 consumer.seek(par, offset);
+
+                consumer.commitSync();
+                System.out.println("KafkaConsumer: Finished committing" + offset);
+
             }
             response.getFirstChild("reason").setValue("Committed offset " + offset + " for topic " + topic);
             response.getFirstChild("status").setValue(1);
-
         } catch (
                 CommitFailedException | RebalanceInProgressException ex) {
             response.getFirstChild("reason").setValue(ex.getMessage());

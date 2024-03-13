@@ -13,13 +13,13 @@ type PollSettings: void{
 
 type UpdateOutboxRequest{
     .tHandle: string                                    // The transaction handle
-    .commitTransaction: bool                            // If true, the transaction will be commited after executing sqlQuery
+    .commitTransaction[0, 1]: bool                            // If true, the transaction will be commited after executing sqlQuery
     .operation: string                                  // The operation to be called on the receiver service
     .data: string                                       // A json representation of the request to pass to .operation
     .topic: string                                      // The kafka topic on which the update should be broadcast
 }
 
-type OutboxSettings{
+type OutboxConfig{
     .databaseConnectionInfo: ConnectionInfo             // The connectioninfo used to connect to the database. See docs the Database module.
     .pollSettings: PollSettings                        // Object of type PollSettings descibing the desired behaviour of the MessageForwarder
     .brokerOptions: KafkaOptions // RabbitMqOptions
@@ -47,10 +47,6 @@ type MFSParams{
         .idColumn: string
     }
     .brokerOptions: KafkaOptions
-}
-
-interface MessageForwarderInterface {
-    OneWay: startReadingMessages ( void )
 }
 
 //-------------------- Kafka Inserter Types -----------------//

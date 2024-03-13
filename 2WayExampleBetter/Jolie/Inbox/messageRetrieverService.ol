@@ -58,13 +58,6 @@ service MessageRetriever(p: MRSEmbeddingConfig) {
     main
     {
         [beginReading()]{
-            // Restart reading if something goes wrong
-            install (default => {
-                scheduleTimeout@Time( 10{
-                    operation = "beginReading"
-            } )(  )
-            })
-
             // Try reading some messages
             consume@KafkaConsumer( {timeoutMs = 3000} )( consumeResponse )
             println@Console( "MRS: Received " + #consumeResponse.messages + " messages from KafkaConsumerService" )(  )
@@ -77,15 +70,15 @@ service MessageRetriever(p: MRSEmbeddingConfig) {
                 println@Console( "InboxService: Retrieved message: " + consumeResponse.messages[i].value + " at offset " + consumeResponse.messages[i].offset)( )
                 recievedKafkaMessage << consumeResponse.messages[i]
                 recieveKafka@InboxWriter( recievedKafkaMessage )( recievedKafkaMessageResponse )
-                if ( recievedKafkaMessageResponse == "Message stored" ||
-                    recievedKafkaMessageResponse == "Message already recieved, please re-commit" )
-                {
-                    commitRequest.offset = consumeResponse.messages[i].offset
-                    commit@KafkaConsumer( commitRequest )( commitResponse )
-                }
+                
+                println@Console("MRS: InboxWriter finished")()
+
+                commitRequest.offset = consumeResponse.messages[i].offset
+                commit@KafkaConsumer( commitRequest )( commitResponse )
+                println@Console("MRS: finished Comitting")()
             }
 
-            scheduleTimeout@Time( 10{
+            scheduleTimeout@Time( 1000{
                     operation = "beginReading"
             } )(  )
         }

@@ -4,7 +4,7 @@ from reflection import Reflection
 from time import Time
 from console import Console
 
-from .inboxTypes import InboxEmbeddingConfig
+from .inboxTypes import InboxConfig, InboxReaderInterface
 from ..ServiceA.serviceAInterface import ServiceAInterfaceLocal
 from ..TransactionService.transactionService import TransactionServiceOperations
 
@@ -13,7 +13,7 @@ interface InboxReaderInterface {
         beginReading
 }
 
-service InboxReaderService (p: InboxEmbeddingConfig){
+service InboxReaderService (p: InboxConfig){
     execution: concurrent
 
     embed Console as Console
@@ -58,7 +58,7 @@ service InboxReaderService (p: InboxEmbeddingConfig){
             }
         }
         
-        scheduleTimeout@Time( 10{
+        scheduleTimeout@Time( 1000{
                     operation = "beginReading"
             } )(  )
 
@@ -68,46 +68,14 @@ service InboxReaderService (p: InboxEmbeddingConfig){
     main
     {
         [beginReading()]{
-            install (default => {
-                println@Console("Caught some default exception!")()
-                scheduleTimeout@Time( 1000{
-                    operation = "beginReading"
-                } )(  )
-            })
-
             query@Database("SELECT * FROM inbox;")( queryResponse );
+            println@Console("InboxReader found " + #queryResponse.row + " rows in the inbox")()
             for ( row in queryResponse.row )
             {
-                install ( TransactionClosedFault  => 
-                    {
-                        // This exception is thrown if the query above includes a message whose transaction is
-                        // closed before we manage to abort it.
-                        // In this case, we don't want to reopen a transaction for said message.
-                        undef(global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid))
-                    } )
-                
-                // If we already have an open transaction for some inbox message,
-                // it might have been lost or some service might have crashed before commiting.
-                // We will abort the transaction and attempt again.
-                if (is_defined(global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid)))
-                {
-                    tHandle = global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid)
-                    abort@TransactionService( tHandle )( aborted )
-                    if ( !aborted )
-                    {
-                        // We enter here if the transaction is committed by some other service
-                        // before this abort reaches the transaction service
-                        throw ( TransactionClosedFault )
-                    }
-                    undef(global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid))
-                }
-
                 // Initialize a new transaction to pass onto Service A
                 initializeTransaction@TransactionService()(tHandle)
-                global.openTransactions.(row.arrivedfromkafka + ":" + row.messageid) = tHandle;
 
                 // Within this new transaction, update the current message as read
-                // TODO: Remember that this query will fail 
                 with( updateRequest )
                 {
                     .handle = tHandle;
@@ -130,35 +98,23 @@ service InboxReaderService (p: InboxEmbeddingConfig){
                     .operation = row.operation
                 }
 
-                invokeRRUnsafe@Reflection( embedderInvokationRequest )()
+                scope ( CatchUserFault ){
+                    println@Console("InboxReader trying to catch user fault")()
+                    install (default => {
+                        commit@TransactionService( tHandle )()
+                        scheduleTimeout@Time( 1000{
+                            operation = "beginReading"
+                        } )(  )
+                    })
+
+                    invokeRRUnsafe@Reflection( embedderInvokationRequest )()
+                    commit@TransactionService( tHandle )( ret )
+                }
             }
 
-            // Now we do some cleanup in the global "opentransaction" variable, just for lolz
-            // We do this by finding all the openTransactions which do not match a message in the inbox table,
-            // meaning they've been committed and deleted.
-            for ( transaction in global.openTransactions )
-            {
-                transactionIsClosed = true
-                for ( row in queryResponse.rows )
-                {
-                    // If some message in the database matches the message in this open transaction,
-                    // clearly the trnasaction is not closed yet.
-                    if ( row.arrivedfromkafka + ":" + row.messageid == transaction )
-                    {
-                        transactionIsClosed = false
-                    }
-                }
-                if ( transactionIsClosed )
-                {
-                    undef( global.openTransactions.transaction )
-                }
-            }
-            
-            // Wait for 1 second, then start from begining
-            scheduleTimeout@Time(1000{
-                    operation = "beginReading"
+            scheduleTimeout@Time( 1000{
+                            operation = "beginReading"
             } )(  )
-
         }
     }
 }

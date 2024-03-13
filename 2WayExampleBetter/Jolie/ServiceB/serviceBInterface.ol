@@ -4,6 +4,6 @@ type NumbersUpdatedRequest{
 }
 
 interface ServiceBInterface {
-    OneWay:
-        numbersUpdated( NumbersUpdatedRequest )
+    RequestResponse:
+        numbersUpdated( NumbersUpdatedRequest ) ( string )
 }

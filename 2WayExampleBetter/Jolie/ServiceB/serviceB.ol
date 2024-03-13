@@ -19,11 +19,8 @@ service ServiceB{
         interfaces: ServiceBInterface
     }
 
-    outputPort OutboxService {
+    outputPort IBOB {
         Location: "local"
-        Protocol: http{
-            format = "json"
-        }
         Interfaces: OutboxInterface
     }
 
@@ -42,6 +39,7 @@ service ServiceB{
             }) ( config )
 
         getLocalLocation@Runtime()( location )
+
         with( inboxConfig )
         { 
             .localLocation << location;
@@ -52,27 +50,20 @@ service ServiceB{
             .kafkaInboxOptions << config.kafkaInboxOptions
         }
 
-        loadEmbeddedService@Runtime( { 
-            filepath = "Inbox/inboxWriter.ol"
-            params << inboxConfig
-        } )( )
+        with ( outboxConfig ){
+            .pollSettings << config.pollOptions;
+            .databaseConnectionInfo << config.serviceBConnectionInfo;
+            .brokerOptions << config.kafkaOutboxOptions;
+            .transactionServiceLocation << TransactionService.location
+        }
 
-        loadEmbeddedService@Runtime( { 
-            filepath = "Inbox/inboxReader.ol"
-            params << inboxConfig
-        } )( )
-
-        // Load the outbox service as an embedded service
-        loadEmbeddedService@Runtime( {
-            filepath = "Outbox/outboxService.ol"
+        loadEmbeddedService@Runtime({
+            filepath = "InboxOutbox/ibob.ol"
             params << { 
-                pollSettings << config.pollOptions;
-                databaseConnectionInfo << config.serviceBConnectionInfo;
-                brokerOptions << config.kafkaOutboxOptions;
-                transactionServiceLocation << TransactionService.location
-            }
-        } )( OutboxService.location )    // It is very important that this is a lower-case 'location', otherwise it doesn't work
-                                        // Guess how long it took me to figure that out :)
+                .inboxConfig << inboxConfig;
+                .outboxConfig << outboxConfig
+                }
+        })(IBOB.location)
 
         connect@TransactionService(config.serviceBConnectionInfo)()
         connect@Database( config.serviceBConnectionInfo )( )
@@ -86,7 +77,7 @@ service ServiceB{
 
     main 
     {
-        [numbersUpdated( req )]
+        [numbersUpdated( req )( res )
         {   
             with ( userExistsQuery ){
                 .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "'";
@@ -113,14 +104,14 @@ service ServiceB{
             }
             with ( outboxQuery ){
                     .tHandle = req.handle;
-                    .commitTransaction = true;
                     .topic = config.kafkaOutboxOptions.topic;
                     .operation = "finalizeChoreography"
             }
             getJsonString@JsonUtils( updateServiceCRequest )( outboxQuery.data )
 
-            updateOutbox@OutboxService( outboxQuery )( updateResponse )
+            updateOutbox@IBOB( outboxQuery )( updateResponse )
             println@Console("Service B has updated locally")()
-        }
+            res = "Service B has updated locally"
+        }]
     }
 }

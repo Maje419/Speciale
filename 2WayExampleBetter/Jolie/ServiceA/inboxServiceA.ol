@@ -2,11 +2,11 @@ from runtime import Runtime
 from console import Console
 
 from .serviceAInterface import ServiceAInterfaceExternal, ServiceAInterfaceLocal
-from ..Inbox.inboxTypes import InboxEmbeddingConfig
-from ..Inbox.inboxWriter import InboxWriterService
+from ..Inbox.inboxTypes import InboxConfig
+from ..Inbox.inboxWriter import InboxWriterExternalInterface, InboxWriterService
 from ..Inbox.inboxReader import InboxReaderService
 
-service InboxServiceA (p: InboxEmbeddingConfig){
+service InboxServiceA (p: InboxConfig){
     execution: concurrent
 
     inputPort ServiceAExternal {
@@ -17,11 +17,18 @@ service InboxServiceA (p: InboxEmbeddingConfig){
         Interfaces: ServiceAInterfaceExternal
     }
 
+    outputPort IBOB {
+        Location: "local" // overwritten in init
+        Interfaces: InboxWriterExternalInterface
+    }
+    
     embed Console as Console
     embed Runtime as Runtime
-    embed InboxWriterService(p) as InboxWriter
-    embed InboxReaderService(p) as InboxReader
     
+    init {
+        IBOB.location = p.ibobLocation
+    }
+
     main
     {
         [ updateNumber( req )( res )
@@ -32,7 +39,7 @@ service InboxServiceA (p: InboxEmbeddingConfig){
                 .request << req
             }
 
-            insertIntoInbox@InboxWriter( inboxMessage )( IWRes )
+            insertIntoInbox@IBOB( inboxMessage )( IWRes )
 
             if (IWRes == "Message stored") {
                 res = "Choreography Started!"
