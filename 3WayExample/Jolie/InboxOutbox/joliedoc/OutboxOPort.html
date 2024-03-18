@@ -1,0 +1,206 @@
+<html><head><style>
+                body {
+        font-family: Verdana, Helvetica, sans-serif;
+    }
+
+    .resource-label {
+        height:40px;
+        font-size: 14px;
+        text-align:center;
+        color:white;
+        font-weight:bold;
+        border-radius:5px;
+        width:6%;
+    }
+
+    a {
+        font-weight:bold;
+        text-decoration:none;
+        color: #600;
+    }
+
+    tr:hover td:not(:first-child) {
+ 	    background-color: #ffffcc;
+    }
+
+
+    .type-definition a:hover {
+        color: #aa0000;
+    }
+
+    .type-definition {
+        margin-left:30px;
+        margin-top:50px;
+        width:90%;
+    }
+    .type-definition th {
+        font-size:20px;
+        text-align: left;
+        background-color: #fff;
+        color:black;
+        border-radius:5px;
+    }
+ 	.type-definition th.content-td{
+        border-bottom:1px solid #555;
+        border-radius:0px;
+    }
+    .type-definition tr td {
+
+        border-bottom:1px dotted #ddd;
+	}
+    .type-definition tr td:first-child {
+        border-bottom:0px;
+	}
+
+    .type-definition .resource-label-type {
+        background-color: red;
+        color:white;
+        text-align:center;
+        font-size:14px;
+    }
+
+    .content-td {
+        padding-left: 20px;
+        width: 30%;
+        background-color: #eee;
+        padding-bottom: 5px;
+        padding-top: 5px;
+        border-radius: 5px;
+        font-size: 15px;
+        font-family: 'Courier New';
+    }
+    .documentation {
+        font-style: italic;
+    }
+
+    .interface-definition {
+        margin-left:30px;
+        margin-top:50px;
+        width:90%;
+    }
+
+    .interface-definition .resource-label-interface {
+        background-color: #107710;
+        color:white;
+        text-align:center;
+        font-size:14px;
+    }
+
+    .interface-definition th {
+        font-size:20px;
+        text-align: left;
+        background-color: #fff;
+        color:black;
+        border-radius:5px;
+    }
+
+ 	.interface-definition th.content-td{
+        border-bottom:1px solid #555;
+        border-radius:0px;
+    }
+
+    .operation-name {
+        font-weight: bold;
+        font-size:18px;
+        padding-left:20px;
+    }
+
+    .operation-button {
+        font-size: 10px;
+        border: 1px solid #666;
+        padding: 4px;
+        margin-right: 10px;
+        float: right;
+        cursor: pointer;
+    }
+
+    .operation-button:hover {
+        background-color:#666;
+        color:white;
+    }
+
+    .rr-type {
+        background-color:#929900;
+        color:white;
+    }
+
+    .ow-type {
+        background-color:#cca133;
+        color:white;
+    }
+
+    .message-type {
+        font-style:italic;
+        font-size:12px;
+        color:#444;
+    }
+
+    .interface-definition a {
+        font-size: 14px;
+    }
+
+    .interface-definition .content-td {
+        padding-top:10px;
+        padding-bottom:10px;
+        width:32%;
+    }
+
+    .fault-name {
+        font-size:14px;
+    }
+
+        .port-definition a {
+        font-size: 14px;
+        color: #050;
+    }
+
+    .port-definition th.content-td{
+        border-bottom:1px solid #555;
+        border-radius:0px;
+    }
+
+    .port-definition .resource-label-ip {
+        background-color: blue;
+        color:white;
+        text-align:center;
+        font-size:14px;
+    }
+
+    .port-definition .resource-label-op {
+        background-color: black;
+        color:white;
+        text-align:center;
+        font-size:14px;
+    }
+
+    .port-definition th {
+        font-size: 20px;
+        text-align: left;
+        background-color: #fff;
+        color: black;
+    }
+
+    .port-definition {
+        margin-left:30px;
+        margin-top:50px;
+        width:90%;
+    }
+
+    .port-element {
+        font-weight: bold;
+    }
+
+    .port-definition .content-td {
+        width:44%;
+    }
+    </style><script>
+        function openDetails( operation ) {
+            if ( document.getElementById( "doc_" + operation ).style.display == "none" ) {
+                document.getElementById( "doc_" + operation ).style.display = "table-row";
+                document.getElementById( "faults_" + operation ).style.display = "table-row"
+            } else {
+                document.getElementById( "doc_" + operation ).style.display = "none";
+                document.getElementById( "faults_" + operation ).style.display = "none"
+            }
+        }
+    </script></head><body><table class='port-definition'><tr><th class='resource-label-op resource-label'>op</th><th id='Outbox' colspan='2' class='content-td'>Outbox</th></tr><tr><td></td><td class='content-td port-element'>Location:</td><td class='content-td'>local</td></tr><tr><td></td><td class='content-td port-element'>Protocol:</td><td class='content-td'></td></tr><tr><td></td><td class='content-td port-element'>Interfaces:</td><td class='content-td'><a href='#'>OutboxInterface<a>&nbsp;&nbsp;</td></tr></table><hr><table class='interface-definition'><tr><th id='OutboxInterface' class='resource-label-interface resource-label'>intf</th><th id='OutboxInterface' colspan='3' class='content-td'>OutboxInterface</th></tr><tr><td>&nbsp;</td></tr><tr><td></td><td colspan='4' class='documentation'> This interface provides the operation needed to insert a message into the outbox </td></tr><tr><td>&nbsp;</td></tr><tr><td class='resource-label rr-type'>rr</td><td class='content-td operation-name'><span>updateOutbox</span><button onclick='openDetails("updateOutbox")' class='operation-button'>Details</button></td><td class='content-td'><span class='message-type'>Request:</span><a href='#UpdateOutboxRequest'>UpdateOutboxRequest</a></td><td class='content-td'><span class='message-type'>Response:</span><a href='#StatusResponse'>StatusResponse</a></td></tr></td></tr><tr id='doc_updateOutbox' style='display:none'><td></td><td colspan='3' class='documentation'> Inserts a message in the outbox </td><tr><tr><td><br></td></tr></table><hr><table class='type-definition'><tr><th class='resource-label-type resource-label'>type</th><th id='StatusResponse' colspan='2' class='content-td'>StatusResponse</th></tr><tr><td>&nbsp;</td></tr><tr><td></td><td colspan='2' class='documentation'> A response object for messages being inserted into kafka </td></tr><tr><td>&nbsp;</td></tr><tr><td></td><td class='content-td'><b>type</b> StatusResponse<b>:</b>&nbsp;<b>void</b> {</td><td class='documentation'></td></tr><tr><td></td><td class='content-td'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.success[1,1]:&nbsp;<b>bool</b></td><td class='documentation'> Whether the call was a success</td></tr><tr><td></td><td class='content-td'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.message[1,1]:&nbsp;<b>string</b></td><td class='documentation'> A string describing the message which was inserted into kafka, or the exception message if one occured </td></tr><tr><td></td><td class='content-td'>}</td><td></td></tr></table><table class='type-definition'><tr><th class='resource-label-type resource-label'>type</th><th id='StatusResponse' colspan='2' class='content-td'>StatusResponse</th></tr><tr><td>&nbsp;</td></tr><tr><td></td><td class='content-td'><b>type</b> StatusResponse<b>:</b>&nbsp;<a href='#StatusResponse'>StatusResponse</a></td><td></td></tr></table><table class='type-definition'><tr><th class='resource-label-type resource-label'>type</th><th id='UpdateOutboxRequest' colspan='2' class='content-td'>UpdateOutboxRequest</th></tr><tr><td>&nbsp;</td></tr><tr><td></td><td colspan='2' class='documentation'> A request to insert some message into the outbox </td></tr><tr><td>&nbsp;</td></tr><tr><td></td><td class='content-td'><b>type</b> UpdateOutboxRequest<b>:</b>&nbsp;<b>void</b> {</td><td class='documentation'></td></tr><tr><td></td><td class='content-td'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.data[1,1]:&nbsp;<b>string</b></td><td class='documentation'> A json representation of the request to pass to .operation</td></tr><tr><td></td><td class='content-td'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.tHandle[1,1]:&nbsp;<b>string</b></td><td class='documentation'> The transaction handle</td></tr><tr><td></td><td class='content-td'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.topic[1,1]:&nbsp;<b>string</b></td><td class='documentation'> The kafka topic on which the update should be broadcast</td></tr><tr><td></td><td class='content-td'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.operation[1,1]:&nbsp;<b>string</b></td><td class='documentation'> The operation to be called on the receiver service</td></tr><tr><td></td><td class='content-td'>}</td><td></td></tr></table><table class='type-definition'><tr><th class='resource-label-type resource-label'>type</th><th id='UpdateOutboxRequest' colspan='2' class='content-td'>UpdateOutboxRequest</th></tr><tr><td>&nbsp;</td></tr><tr><td></td><td class='content-td'><b>type</b> UpdateOutboxRequest<b>:</b>&nbsp;<a href='#UpdateOutboxRequest'>UpdateOutboxRequest</a></td><td></td></tr></table></body></html>

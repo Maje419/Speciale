@@ -1,6 +1,6 @@
 type UpdateNumberRequest {
     .username: string
-    .handle: string
+    .handle*: string
 }
 
 type FinalizeChoreographyRequest {

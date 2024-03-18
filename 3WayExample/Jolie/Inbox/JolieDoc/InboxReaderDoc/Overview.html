@@ -1,0 +1,48 @@
+<html><head><style>
+        body {
+            font-family:'Courier New';
+        }
+        .picture {
+            padding-top:50px;
+            text-align:center;
+        }
+
+        .link:hover {
+            fill: #660000;
+        }
+        .dependency-map {
+            padding:20px;
+        }
+        .input-operation {
+            width:50%;
+        }
+       .dependency-table {
+            width: 100%;
+            border: 1px solid #444;
+            padding: 10px;
+        }
+
+        .dependency-table a {
+            color: black;
+            text-decoration: none;
+        }
+
+
+        .dependency-table a:hover {
+            color: #600;
+        }
+
+        .dependency-table th {
+            text-align: left;
+        }
+
+        .dependency-list {
+            background-color: #ddd;
+            padding-left: 20%;
+        }
+        .legenda {
+            font-size: 12px;
+            font-style: italic;
+            color: #888;
+        }
+    </style></head><body><table width='100%'><tr><td valign='top' class='picture' width='50%'><svg height='860' width='800'><polygon points='300,80 300,780 500,860 500,0' style='fill:#ffcc00;stroke:#cc6600;stroke-width:2' /><polygon points='275,430 300,455 325,430 300,405 ' style='fill:#ffff66;stroke:#cc9900;stroke-width:2' /><a xlink:href='SelfIPort.html'><text class='link' x='265' y='420' text-anchor='end' fill='black' font-family='Courier New' font-weight='bold'>Self</text></a><text x='285' y='435'  font-size='10px' fill='black' font-family='Courier New'></text><text x='265' y='450' text-anchor='end'  font-size='10px' fill='black' font-family='Courier New'>local</text><line x1='0' y1='430' x2='275' y2='430' style='stroke:#ddd;stroke-width:1'/><polygon points='500,155 525,130 500,105 '  style='fill:#ff0000;stroke:#000000;stroke-width:2' /><a xlink:href='ConsoleOPort.html'><text class='link' x='535' y='120' fill='black' font-family='Courier New' font-weight='bold'>Console</text></a><text x='535' y='150' fill='black' font-size='10px' font-family='Courier New'>local,</text><line x1='525' y1='130' x2='800' y2='130' style='stroke:#ddd;stroke-width:1'/><polygon points='500,255 525,230 500,205 '  style='fill:#ff0000;stroke:#000000;stroke-width:2' /><a xlink:href='DatabaseOPort.html'><text class='link' x='535' y='220' fill='black' font-family='Courier New' font-weight='bold'>Database</text></a><text x='535' y='250' fill='black' font-size='10px' font-family='Courier New'>local,</text><line x1='525' y1='230' x2='800' y2='230' style='stroke:#ddd;stroke-width:1'/><polygon points='500,355 525,330 500,305 '  style='fill:#ff0000;stroke:#000000;stroke-width:2' /><a xlink:href='JsonUtilsOPort.html'><text class='link' x='535' y='320' fill='black' font-family='Courier New' font-weight='bold'>JsonUtils</text></a><text x='535' y='350' fill='black' font-size='10px' font-family='Courier New'>local,</text><line x1='525' y1='330' x2='800' y2='330' style='stroke:#ddd;stroke-width:1'/><polygon points='500,455 525,430 500,405 '  style='fill:#ff0000;stroke:#000000;stroke-width:2' /><a xlink:href='ReflectionOPort.html'><text class='link' x='535' y='420' fill='black' font-family='Courier New' font-weight='bold'>Reflection</text></a><text x='535' y='450' fill='black' font-size='10px' font-family='Courier New'>local,</text><line x1='525' y1='430' x2='800' y2='430' style='stroke:#ddd;stroke-width:1'/><polygon points='500,555 525,530 500,505 '  style='fill:#ff0000;stroke:#000000;stroke-width:2' /><a xlink:href='TimeOPort.html'><text class='link' x='535' y='520' fill='black' font-family='Courier New' font-weight='bold'>Time</text></a><text x='535' y='550' fill='black' font-size='10px' font-family='Courier New'>local,</text><line x1='525' y1='530' x2='800' y2='530' style='stroke:#ddd;stroke-width:1'/><polygon points='500,655 525,630 500,605 '  style='fill:#ff0000;stroke:#000000;stroke-width:2' /><a xlink:href='EmbedderOPort.html'><text class='link' x='535' y='620' fill='black' font-family='Courier New' font-weight='bold'>Embedder</text></a><text x='535' y='650' fill='black' font-size='10px' font-family='Courier New'>local,</text><line x1='525' y1='630' x2='800' y2='630' style='stroke:#ddd;stroke-width:1'/><polygon points='500,755 525,730 500,705 '  style='fill:#ff0000;stroke:#000000;stroke-width:2' /><a xlink:href='TransactionServiceOPort.html'><text class='link' x='535' y='720' fill='black' font-family='Courier New' font-weight='bold'>TransactionService</text></a><text x='535' y='750' fill='black' font-size='10px' font-family='Courier New'>local,</text><line x1='525' y1='730' x2='800' y2='730' style='stroke:#ddd;stroke-width:1'/></svg></td><td valign='top' class='dependency-map'><h1>Dependency Map</h1><span class='legenda'>Legenda:</span><br><table class='dependency-table'><tr><th class='input-operation'>input operation</th></tr><tr><td class='dependency-list'><i>communication dependencies</i></td></tr></tr></table><br><br><table class='dependency-table'><tr><td colspan='2' class='input-operation'>beginReading</td></tr><tr><td class='dependency-list'><table width='100%'><tr><td>query@<b><a href='DatabaseOPort.html'>Database</a></b></td></tr><tr><td>println@<b><a href='ConsoleOPort.html'>Console</a></b></td></tr><tr><td>initializeTransaction@<b><a href='TransactionServiceOPort.html'>TransactionService</a></b></td></tr><tr><td>executeUpdate@<b><a href='TransactionServiceOPort.html'>TransactionService</a></b></td></tr><tr><td>getJsonValue@<b><a href='JsonUtilsOPort.html'>JsonUtils</a></b></td></tr><tr><td>println@<b><a href='ConsoleOPort.html'>Console</a></b></td></tr><tr><td>println@<b><a href='ConsoleOPort.html'>Console</a></b></td></tr><tr><td>abortTransaction@<b><a href='TransactionServiceOPort.html'>TransactionService</a></b></td></tr><tr><td>initializeTransaction@<b><a href='TransactionServiceOPort.html'>TransactionService</a></b></td></tr><tr><td>invokeRRUnsafe@<b><a href='ReflectionOPort.html'>Reflection</a></b></td></tr><tr><td>commit@<b><a href='TransactionServiceOPort.html'>TransactionService</a></b></td></tr><tr><td>scheduleTimeout@<b><a href='TimeOPort.html'>Time</a></b></td></tr></table></td></tr></table><td></table></body></html>

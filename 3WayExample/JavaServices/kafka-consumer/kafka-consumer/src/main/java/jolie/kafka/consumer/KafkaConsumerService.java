@@ -108,11 +108,11 @@ public class KafkaConsumerService extends JavaService {
                 consumer.commitSync();
             }
             response.getFirstChild("reason").setValue("Committed offset " + offset + " for topic " + topic);
-            response.getFirstChild("status").setValue(1);
+            response.getFirstChild("status").setValue(0);
 
         } catch (CommitFailedException | RebalanceInProgressException ex) {
             response.getFirstChild("reason").setValue(ex.getMessage());
-            response.getFirstChild("status").setValue(0);
+            response.getFirstChild("status").setValue(1);
         }
 
         return response;

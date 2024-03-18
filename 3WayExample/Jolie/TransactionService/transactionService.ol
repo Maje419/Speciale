@@ -18,7 +18,9 @@ type UpdateRequest{
     .handle: TransactionHandle
     .update: string
 }
+
 type UpdateResponse: int
+type AbortResponse: bool
 
 
 interface TransactionServiceSetup {
@@ -32,7 +34,7 @@ interface TransactionServiceOperations {
         executeQuery( QueryRequest )( QueryResult ),
         executeUpdate( UpdateRequest )( UpdateResponse ),
         commit( TransactionHandle )( TransactionResult ),
-        abort ( TransactionHandle ) ( bool )
+        abortTransaction( TransactionHandle )( AbortResponse )
 }
 
 service TransactionService{

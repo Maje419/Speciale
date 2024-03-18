@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeoutException;
 
 import jolie.runtime.CanUseJars;
 import jolie.runtime.FaultException;
@@ -217,7 +218,10 @@ public class TransactionService extends JavaService {
             }
 
             PreparedStatement statement = con.prepareStatement(query);
+
+            statement.setQueryTimeout(5);
             int numberRowsUpdated = statement.executeUpdate();
+
             // Return the number of rows affected by the update
             response.setValue(numberRowsUpdated);
             System.out.println("Transactionservice: Executed update");
@@ -254,7 +258,8 @@ public class TransactionService extends JavaService {
         }
     }
 
-    public boolean abort(String transactionHandle) throws FaultException {
+    public Value abortTransaction(String transactionHandle) throws FaultException {
+        Value response = Value.create();
         try {
             System.out.println("Transactionservice: Aborting transaction");
             Connection con;
@@ -270,7 +275,8 @@ public class TransactionService extends JavaService {
                 con.close();
                 m_openTransactions.remove(transactionHandle);
                 System.out.println("Transactionservice: Transaction aborted");
-                return con.isClosed();
+                response.setValue(con.isClosed());
+                return response;
             }
         } catch (SQLException e) {
             throw new FaultException("SQLException", e);

@@ -17,7 +17,6 @@
   },
   "kafkaOutboxOptions": {
     "bootstrapServer": "localhost:29092",
-    "groupId": "service-c-outbox",
     "topic": "c-out"
   }
 }

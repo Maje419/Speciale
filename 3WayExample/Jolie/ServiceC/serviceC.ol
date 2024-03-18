@@ -19,9 +19,9 @@ service ServiceC{
         interfaces: ServiceCInterface
     }
 
-    outputPort OutboxService {
+    outputPort IBOB {
         Location: "local"
-        Protocol: http{
+        protocol: http{
             format = "json"
         }
         Interfaces: OutboxInterface
@@ -42,36 +42,32 @@ service ServiceC{
             }) ( config )
 
         getLocalLocation@Runtime()( location )
+
         with( inboxConfig )
         { 
             .localLocation << location;
-            .externalLocation << "socket://localhost:8080";       //This doesn't work (yet)
+            .externalLocation << "socket://localhost:8080";       //This doesn't work (yet) - Idea was to be able to "hand over" control of taking incomming messages in a generic way
             .databaseConnectionInfo << config.serviceCConnectionInfo;
             .transactionServiceLocation << TransactionService.location;   // All embedded services must talk to the same instance of 'TransactionServie'
             .kafkaPollOptions << config.pollOptions;
             .kafkaInboxOptions << config.kafkaInboxOptions
         }
 
-        loadEmbeddedService@Runtime( { 
-            filepath = "Inbox/inboxWriter.ol"
-            params << inboxConfig
-        } )( )
+        with ( outboxConfig ){
+            .pollSettings << config.pollOptions;
+            .databaseConnectionInfo << config.serviceCConnectionInfo;
+            .brokerOptions << config.kafkaOutboxOptions;
+            .transactionServiceLocation << TransactionService.location
+        }
 
-        loadEmbeddedService@Runtime( { 
-            filepath = "Inbox/inboxReader.ol"
-            params << inboxConfig
-        } )( )
-
-        // Load the outbox service as an embedded service
-        loadEmbeddedService@Runtime( {
-            filepath = "Outbox/outboxService.ol"
+        loadEmbeddedService@Runtime({
+            filepath = "InboxOutbox/ibob.ol"
             params << { 
-                pollSettings << config.pollOptions;
-                databaseConnectionInfo << config.serviceCConnectionInfo;
-                brokerOptions << config.kafkaOutboxOptions;
-                transactionServiceLocation << TransactionService.location
-            }
-        } )( OutboxService.location )    
+                .inboxConfig << inboxConfig;
+                .outboxConfig << outboxConfig
+                }
+        })(IBOB.location)
+        inboxConfig.ibobLocation = IBOB.location
 
         connect@TransactionService(config.serviceCConnectionInfo)()
         connect@Database( config.serviceCConnectionInfo )( )
@@ -113,13 +109,12 @@ service ServiceC{
 
             with ( outboxQuery ){
                     .tHandle = req.handle;
-                    .commitTransaction = true;
                     .topic = config.kafkaOutboxOptions.topic;
                     .operation = "finalizeChoreography"
             }
             getJsonString@JsonUtils( finalizeServiceARequest )( outboxQuery.data )
 
-            updateOutbox@OutboxService( outboxQuery )( updateResponse )
+            updateOutbox@IBOB( outboxQuery )( updateResponse )
             
             res = true
             println@Console("Service C has updated locally")()
