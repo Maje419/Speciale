@@ -82,6 +82,7 @@ service ServiceB{
     {
         [numbersUpdated( req )()
         {   
+            println@Console("ServiceB: \tupdateNumber called for user " + req.username)()
             with ( userExistsQuery ){
                 .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "'";
                 .handle = req.handle
@@ -113,7 +114,7 @@ service ServiceB{
             getJsonString@JsonUtils( updateServiceCRequest )( outboxQuery.data )
 
             updateOutbox@IBOB( outboxQuery )( updateResponse )
-            println@Console("Service B has updated locally")()
+            println@Console("ServiceB: \tCompleted local update for  " + req.username)()
         }]
     }
 }

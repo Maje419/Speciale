@@ -81,7 +81,7 @@ service InboxWriterService (p: InboxConfig){
             }
         })( )
         
-        println@Console( "InboxWriter Initialized at location '" + localLocation + "'" )( )
+        println@Console( "InboxWriter Initialized" )( )
     }
 
     main{
@@ -120,7 +120,6 @@ service InboxWriterService (p: InboxConfig){
                 update@Database("INSERT INTO inbox (operation, parameters, arrivedFromKafka, messageId) VALUES ('" + req.key + "','" + kafkaValue.parameters + "', true, '" + kafkaValue.mid  + "');")()
                 
                 res = "Message stored"
-                println@Console("InboxWriter returned " + res)()
             }
         }]
     }

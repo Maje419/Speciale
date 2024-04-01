@@ -133,13 +133,14 @@ service ServiceA{
                 getJsonString@JsonUtils( {.username = req.username} )(outboxQuery.data)
 
                 updateOutbox@IBOB( outboxQuery )( updateResponse )
+                println@Console("ServiceA: \tCompleted local update for  " + req.username)()
+
                 res = "Choreography Started!"
             }
-            throw Exception("New Fault")
         }]
 
         [finalizeChoreography( req )]{
-            println@Console("Finished choreography for user " + req.username)()
+            println@Console("ServiceA: \tFinished choreography for user " + req.username)()
         }
     }
 }

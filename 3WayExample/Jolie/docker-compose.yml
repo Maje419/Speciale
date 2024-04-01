@@ -24,7 +24,6 @@ services:
 
   db:
     image: maje419/thesis:postgres
-    pull_policy: always
     restart: always
     environment:
       POSTGRES_PASSWORD: example

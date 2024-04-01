@@ -66,6 +66,7 @@ service IBOB(p: IBOBConfig){
         } )( InboxWriter.location )
 
         // Load the Inbox Reader, which is a poll-consumer from the inbox table. 
+        // This needs to be loaded after the outbox, since it might need to know about the outbox service location
         loadEmbeddedService@Runtime( {
             filepath = "Inbox/inboxReader.ol"
             params << p.inboxConfig

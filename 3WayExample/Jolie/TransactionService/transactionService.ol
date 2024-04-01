@@ -22,7 +22,6 @@ type UpdateRequest{
 type UpdateResponse: int
 type AbortResponse: bool
 
-
 interface TransactionServiceSetup {
     RequestResponse: 
         connect( ConnectRequest ) ( ConnectResponse )

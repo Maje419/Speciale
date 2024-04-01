@@ -1,0 +1,15 @@
+#!/bin/bash
+echo "Enter the username (or 'quit' to exit):"
+
+while read username; do
+    # Prompt user for username input
+
+    # Check if the user wants to quit
+    if [ "$username" == "quit" ]; then
+        echo "Exiting..."
+        break
+    fi
+
+    # Construct the curl request with the provided username
+    curl -s "http://localhost:8080/updateNumber?username=$username"
+done

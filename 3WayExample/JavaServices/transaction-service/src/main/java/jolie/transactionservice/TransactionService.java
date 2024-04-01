@@ -10,7 +10,6 @@ import java.sql.SQLException;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeoutException;
 
 import jolie.runtime.CanUseJars;
 import jolie.runtime.FaultException;
@@ -83,7 +82,6 @@ public class TransactionService extends JavaService {
      * @throws FaultException
      */
     public Value connect(Value request) throws FaultException {
-        System.out.println("Transactionservice: Connecting");
         Value response = Value.create();
 
         // If connectionString is set, this service is already connected to a database
@@ -145,12 +143,10 @@ public class TransactionService extends JavaService {
                 throw new FaultException("DriverClassNotFound", e);
             }
         }
-        System.out.println("Transactionservice: Connected");
         return response;
     }
 
     public Value initializeTransaction() throws FaultException {
-        System.out.println("Transactionservice: initializing new transaction");
         Value response = Value.create();
         Connection con;
         try {
@@ -166,7 +162,6 @@ public class TransactionService extends JavaService {
             m_openTransactions.put(uuid, con);
 
             response.setValue(uuid);
-            System.out.println("Transactionservice: New transaction initialized");
             return response;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -175,7 +170,6 @@ public class TransactionService extends JavaService {
     }
 
     public Value executeQuery(Value input) throws FaultException {
-        System.out.println("Transactionservice: Executing query");
         String transactionHandle = input.getFirstChild("handle").strValue();
         String query = input.getFirstChild("query").strValue();
 
@@ -195,7 +189,6 @@ public class TransactionService extends JavaService {
 
             // Load the result of the query into the response Jolie variable.
             resultSetToValueVector(result, response.getChildren("row"));
-            System.out.println("Transactionservice: Executed query");
             return response;
         } catch (SQLException e) {
             throw new FaultException("SQLException", e);
@@ -203,7 +196,6 @@ public class TransactionService extends JavaService {
     }
 
     public Value executeUpdate(Value input) throws FaultException {
-        System.out.println("Transactionservice: Executing update");
         String transactionHandle = input.getFirstChild("handle").strValue();
         String query = input.getFirstChild("update").strValue();
 
@@ -224,7 +216,6 @@ public class TransactionService extends JavaService {
 
             // Return the number of rows affected by the update
             response.setValue(numberRowsUpdated);
-            System.out.println("Transactionservice: Executed update");
             return response;
         } catch (SQLException e) {
             System.out.println("Query: '" + query + "' failed");
@@ -233,7 +224,6 @@ public class TransactionService extends JavaService {
     }
 
     public Value commit(String transactionHandle) throws FaultException {
-        System.out.println("Transactionservice: Committing transaction");
         Value response = Value.create();
 
         try {
@@ -250,7 +240,6 @@ public class TransactionService extends JavaService {
                 m_openTransactions.remove(transactionHandle);
 
                 response.setValue("Transaction " + transactionHandle + " was commited sucessfully.");
-                System.out.println("Transactionservice: Committed transaction");
                 return response;
             }
         } catch (SQLException e) {
@@ -261,7 +250,6 @@ public class TransactionService extends JavaService {
     public Value abortTransaction(String transactionHandle) throws FaultException {
         Value response = Value.create();
         try {
-            System.out.println("Transactionservice: Aborting transaction");
             Connection con;
             synchronized (m_commitAbortLock) {
                 con = m_openTransactions.get(transactionHandle);
@@ -274,7 +262,6 @@ public class TransactionService extends JavaService {
                 con.rollback();
                 con.close();
                 m_openTransactions.remove(transactionHandle);
-                System.out.println("Transactionservice: Transaction aborted");
                 response.setValue(con.isClosed());
                 return response;
             }

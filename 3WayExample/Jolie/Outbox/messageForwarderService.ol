@@ -36,11 +36,11 @@ service MessageForwarderService(p: MFSParams){
     // Starts this service reading continually from the 'outbox' table
     init {
         connect@Database( p.databaseConnectionInfo )( void )
-        println@Console( "OutboxMessageForwarder Initialized" )(  )
 
         scheduleTimeout@Time( 1000{
                 operation = "startReadingMessages"
         } )(  )
+        println@Console( "OutboxMessageForwarder Initialized" )(  )
     }
 
     main{
@@ -57,8 +57,6 @@ service MessageForwarderService(p: MFSParams){
             query@Database( query )( pulledMessages )
 
             if (#pulledMessages.row > 0){
-                println@Console( "OutboxMessageForwarder: \tForwarding " +  #pulledMessages.row + " messages into kafka!")(  )
-
                 for ( databaseMessage in pulledMessages.row ){
 
                     // Format the information contained in the found message in the form of a Kafka Message
@@ -80,7 +78,6 @@ service MessageForwarderService(p: MFSParams){
                     // If the message was successfully stored, we can delete it from the database
                     if ( kafkaResponse.success ) {
                         deleteQuery = "DELETE FROM outbox WHERE mid = '" + databaseMessage.mid + "'"
-                        println@Console( "OutboxMessageForwarder: \tExecuting query '" + deleteQuery + "'")(  )
                         update@Database( deleteQuery )( updateResponse )
                     }
                 }

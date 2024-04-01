@@ -72,8 +72,6 @@ service InboxReaderService (p: InboxConfig){
         [beginReading()]{
             // Read any messages left in the 'inbox' table
             query@Database("SELECT * FROM inbox;")( queryResponse );
-            println@Console("InboxReader found " + #queryResponse.row + " rows in the inbox")()
-
             for ( row in queryResponse.row )
             {
                 // Initialize a new transaction to pass onto whichever service embeds this one
@@ -90,7 +88,6 @@ service InboxReaderService (p: InboxConfig){
                 
                 // The operation request is stored in the "parameters" column
                 getJsonValue@JsonUtils( row.parameters )( parameters )
-                println@Console("Parameters username: " + parameters.username)()
                 parameters.handle = tHandle
 
                 // Call the corresponding operation at the embedder service

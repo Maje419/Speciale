@@ -1,7 +1,7 @@
 from runtime import Runtime
 from console import Console
 
-from .serviceAInterface import ServiceAInterfaceExternal, ServiceAInterfaceLocal
+from .serviceAInterface import ServiceAInterfaceExternal
 from ..Inbox.inboxTypes import InboxConfig
 from ..Inbox.inboxWriter import InboxWriterExternalInterface, InboxWriterService
 from ..Inbox.inboxReader import InboxReaderService

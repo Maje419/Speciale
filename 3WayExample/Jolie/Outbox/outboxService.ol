@@ -102,7 +102,6 @@ service OutboxService(p: OutboxConfig){
 
             updateMessagesTableQuery = "INSERT INTO outbox (kafkaKey, kafkaValue, mid) VALUES ('" + req.operation + "', '" + req.data + "', '" + messageId + "');" 
             
-            println@Console("Query: " + updateMessagesTableQuery)()
             with ( updateRequest ){
                 .handle = req.tHandle;
                 .update = updateMessagesTableQuery

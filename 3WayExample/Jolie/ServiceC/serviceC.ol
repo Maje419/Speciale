@@ -82,6 +82,7 @@ service ServiceC{
     main
     {
         [updateNumbers( req )( res ){
+            println@Console("ServiceC: \tupdateNumber called for user " + req.username)()
             // Once a request is recieved, we update our own local state for that person
             with ( userExistsQuery ){
                 .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "'";
@@ -117,7 +118,7 @@ service ServiceC{
             updateOutbox@IBOB( outboxQuery )( updateResponse )
             
             res = true
-            println@Console("Service C has updated locally")()
+            println@Console("ServiceC: \tCompleted local update for  " + req.username)()
         }]
     }
 }
