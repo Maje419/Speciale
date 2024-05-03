@@ -48,7 +48,6 @@ service MessageRetriever(p: MRSEmbeddingConfig) {
         }
 
         initialize@KafkaConsumer( inboxSettings )( initializedResponse )
-        println@Console( "MessageRetriever Initialized" )(  )
 
         scheduleTimeout@Time( 500{
             operation = "beginReading"
@@ -60,22 +59,18 @@ service MessageRetriever(p: MRSEmbeddingConfig) {
         [beginReading()]{
             // Try reading some messages
             consume@KafkaConsumer( {timeoutMs = 3000} )( consumeResponse )
-            println@Console( "MRS: Received " + #consumeResponse.messages + " messages from KafkaConsumerService" )(  )
 
             // For each message, write it to inbox, then commit.
             // Message does not count as consumed until committed, and is unique in the inbox, thus guarenteeing
             // exactly-once-delivery
             for ( i = 0, i < #consumeResponse.messages, i++ ) 
             {
-                println@Console( "InboxService: Retrieved message: " + consumeResponse.messages[i].value + " at offset " + consumeResponse.messages[i].offset)( )
                 recievedKafkaMessage << consumeResponse.messages[i]
                 recieveKafka@InboxWriter( recievedKafkaMessage )( recievedKafkaMessageResponse )
                 
-                println@Console("MRS: InboxWriter finished")()
 
                 commitRequest.offset = consumeResponse.messages[i].offset
                 commit@KafkaConsumer( commitRequest )( commitResponse )
-                println@Console("MRS: finished Comitting")()
             }
 
             scheduleTimeout@Time( 1000{

@@ -85,6 +85,7 @@ service ServiceA{
     main {
         [ startChoreography( req )( res )
         {
+            println@Console("Recieved message for operation startChoreography!")()
             // If the handle is not defined, the message was recieved from a Jolie service which is not the InboxReader
             //  We can therefore initiate a new transaction here, and be sure that we're not duplicating an update.
             // Used only in testing.

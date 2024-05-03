@@ -41,7 +41,6 @@ service IBOB(p: IBOBConfig){
     
     init{
         
-        println@Console("HERE! \n")()
         // Load the Outbox service
         loadEmbeddedService@Runtime( {
             filepath = "Outbox/outboxService.ol"

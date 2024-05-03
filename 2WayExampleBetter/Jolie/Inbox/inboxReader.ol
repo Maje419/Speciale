@@ -60,17 +60,15 @@ service InboxReaderService (p: InboxConfig){
         scheduleTimeout@Time( 1000{
                     operation = "beginReading"
             } )(  )
-
-        println@Console("InboxReader initialized")()
     }
 
     main
     {
         [beginReading()]{
             query@Database("SELECT * FROM inbox;")( queryResponse );
-            println@Console("InboxReader found " + #queryResponse.row + " rows in the inbox")()
             for ( row in queryResponse.row )
             {
+                println@Console("Inbox: Reading and processing message for operation " + row.key )()
                 // Initialize a new transaction to pass onto Service A
                 beginTx@Database()(txHandle)
 
@@ -86,7 +84,6 @@ service InboxReaderService (p: InboxConfig){
                 
                 // The operation request is stored in the "parameters" column
                 getJsonValue@JsonUtils( row.parameters )( parameters )
-                println@Console("Parameters username: " + parameters.username)()
                 parameters.txHandle = txHandle
 
                 // Call the corresponding operation at the embedder service
@@ -99,7 +96,6 @@ service InboxReaderService (p: InboxConfig){
 
                 scope ( CatchUserFault ){
                     install (default => {
-                        println@Console("InboxReader trying to catch user fault")()
                         rollbackTx@Database( txHandle )()
 
                         // At this point, the inbox could enter a 'Hey, something went wrong with this message' message into Kafka
@@ -110,9 +106,9 @@ service InboxReaderService (p: InboxConfig){
                         } )(  )
                     })
 
-
                     invokeRRUnsafe@Reflection( embedderInvokationRequest )()
                     commitTx@Database( txHandle )( ret )
+                    println@Console("Inbox: Sucessfully committed update for operation " + row.key + "\n" )()
                 }
             }
 

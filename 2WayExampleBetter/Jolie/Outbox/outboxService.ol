@@ -53,7 +53,6 @@ service OutboxService(p: OutboxConfig){
             }
         })( MFS.location )
 
-        println@Console("OutboxService: \tInitializing connection to Kafka")();
         connect@Database( p.databaseConnectionInfo )( void )
         scope ( createMessagesTable )
         {
@@ -68,7 +67,6 @@ service OutboxService(p: OutboxConfig){
     main {
         [updateOutbox( req )( res ){
             install (ConnectionError => {
-                println@Console("Call to update before connecting")();
                 res.message = "Call to update before connecting!";
                 res.success = false
             })
@@ -81,7 +79,6 @@ service OutboxService(p: OutboxConfig){
 
             updateMessagesTableQuery = "INSERT INTO outbox (kafkaKey, kafkaValue, mid) VALUES ('" + req.operation + "', '" + req.data + "', '" + messageId + "');" 
             
-            println@Console("Query: " + updateMessagesTableQuery)()
             with ( updateRequest ){
                 .txHandle = req.txHandle;
                 .update = updateMessagesTableQuery
@@ -89,6 +86,7 @@ service OutboxService(p: OutboxConfig){
 
             update@Database( updateRequest )( updateResponse )
             
+            println@Console("Outbox: Updated outbox with key: " + req.operation)()
             res.message = "Outbox updated"
             res.success = true
         }]

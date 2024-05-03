@@ -33,7 +33,6 @@ service MessageForwarderService(p: MFSParams){
     // Starts this service reading continually from the 'outbox' table
     init {
         connect@Database( p.databaseConnectionInfo )( void )
-        println@Console( "OutboxMessageForwarder Initialized" )(  )
 
         scheduleTimeout@Time( 1000{
                 operation = "startReadingMessages"
@@ -43,7 +42,6 @@ service MessageForwarderService(p: MFSParams){
     main{
         [startReadingMessages()(){
             install (default => {
-                println@Console("MFS: caught some error")()
                 scheduleTimeout@Time( 1000{
                     operation = "startReadingMessages"
                 } )(  )
@@ -53,7 +51,6 @@ service MessageForwarderService(p: MFSParams){
             query@Database( query )( pulledMessages )
 
             if (#pulledMessages.row > 0){
-                println@Console( "OutboxMessageForwarder: \tForwarding " +  #pulledMessages.row + " messages into kafka!")(  )
 
                 for ( databaseMessage in pulledMessages.row ){
                     kafkaMessage.topic = p.brokerOptions.topic
@@ -70,10 +67,8 @@ service MessageForwarderService(p: MFSParams){
 
                     propagateMessage@KafkaInserter( kafkaMessage )( kafkaResponse )
 
-                    println@Console( "Response status: " + kafkaResponse.success )(  )
                     if ( kafkaResponse.success ) {
                         deleteQuery = "DELETE FROM outbox WHERE mid = '" + databaseMessage.mid + "'"
-                        println@Console( "OutboxMessageForwarder: \tExecuting query '" + deleteQuery + "'")(  )
                         update@Database( deleteQuery )( updateResponse )
                     }
                 }

@@ -11,5 +11,5 @@ while read username; do
     fi
 
     # Construct the curl request with the provided username
-    curl -s "http://localhost:8080/updateNumber?username=$username"
+    curl -s -o /dev/null "http://localhost:8080/startChoreography?username=$username"
 done

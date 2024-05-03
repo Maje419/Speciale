@@ -74,6 +74,7 @@ service ServiceB{
     {
         [react( req )( res )
         {   
+            println@Console("Recieved message for operation react!")()
             scope (ExecuteLocalupdate) {
                 with ( userExistsQuery ){
                     .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "'";
@@ -109,7 +110,6 @@ service ServiceB{
                 getJsonString@JsonUtils( updateServiceCRequest )( outboxQuery.data )
 
                 updateOutbox@IBOB( outboxQuery )( updateResponse )
-                println@Console("Service B has updated locally")()
             }
             res = "Service B has updated locally"
         }]

@@ -84,12 +84,11 @@ service InboxWriterService (p: InboxConfig){
                 kafkaInboxOptions << p.kafkaInboxOptions
             }
         })( )
-        
-        println@Console( "InboxWriter Initialized at location '" + localLocation + "'" )( )
     }
 
     main{
         [insertIntoInbox( req )( res ){
+            println@Console("Inbox: Storing incomming message for operation " + req.operation)()
             scope( MakeIdempotent )
             {
                 install( SQLException => res = "Problem inserting the message")
@@ -114,6 +113,7 @@ service InboxWriterService (p: InboxConfig){
 
         [recieveKafka( req )( res ) 
         {
+            println@Console("Inbox: Storing incomming message for operation " + req.key)()
             scope( MakeIdempotent )
             {
                 install( SQLException => res = "Message already recieved" )
@@ -124,7 +124,6 @@ service InboxWriterService (p: InboxConfig){
                 update@Database("INSERT INTO inbox (operation, parameters, arrivedFromKafka, messageId) VALUES ('" + req.key + "','" + kafkaValue.parameters + "', true, '" + kafkaValue.mid  + "');")()
                 
                 res = "Message stored"
-                println@Console("InboxWriter returned " + res)()
             }
         }]
     }
