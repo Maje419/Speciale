@@ -6,7 +6,6 @@ from json-utils import JsonUtils
 
 from .serviceBInterface import ServiceBInterface
 from ..Outbox.outboxService import OutboxInterface
-from ..TransactionService.transactionService import TransactionService
 
 service ServiceB{
     execution: concurrent
@@ -29,7 +28,6 @@ service ServiceB{
     embed File as File
     embed JsonUtils as JsonUtils
     embed Runtime as Runtime
-    embed TransactionService as TransactionService
 
     init {
         readFile@File(
@@ -43,9 +41,8 @@ service ServiceB{
         with( inboxConfig )
         { 
             .localLocation << location;
-            .externalLocation << "socket://localhost:8080";       //This doesn't work (yet)
             .databaseConnectionInfo << config.serviceBConnectionInfo;
-            .transactionServiceLocation << TransactionService.location;   // All embedded services must talk to the same instance of 'TransactionServie'
+            .databaseServiceLocation << Database.location;
             .kafkaPollOptions << config.pollOptions;
             .kafkaInboxOptions << config.kafkaInboxOptions
         }
@@ -54,7 +51,7 @@ service ServiceB{
             .pollSettings << config.pollOptions;
             .databaseConnectionInfo << config.serviceBConnectionInfo;
             .brokerOptions << config.kafkaOutboxOptions;
-            .transactionServiceLocation << TransactionService.location
+            .databaseServiceLocation << Database.location
         }
 
         loadEmbeddedService@Runtime({
@@ -65,52 +62,55 @@ service ServiceB{
                 }
         })(IBOB.location)
 
-        connect@TransactionService(config.serviceBConnectionInfo)()
         connect@Database( config.serviceBConnectionInfo )( )
 
         scope ( createtable ) 
         {
-            updaterequest = "CREATE TABLE IF NOT EXISTS numbers(username VARCHAR(50) NOT null, number INT)"
-            update@Database( updaterequest )( ret )
+            update@Database( "CREATE TABLE IF NOT EXISTS numbers(username VARCHAR(50) NOT null, number INT)" )( ret )
         }
     }
 
     main 
     {
-        [numbersUpdated( req )( res )
+        [react( req )( res )
         {   
-            with ( userExistsQuery ){
-                .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "'";
-                .handle = req.handle
+            scope (ExecuteLocalupdate) {
+                with ( userExistsQuery ){
+                    .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "'";
+                    .txHandle = req.txHandle
+                }
+                query@Database( userExistsQuery )( userExists )
+                    
+                // Construct query which updates local state:
+                if (#userExists.row < 1)
+                {
+                    localUpdate.update = "INSERT INTO Numbers VALUES ('" + req.username + "', 0);"
+                } 
+                else
+                {
+                    localUpdate.update = "UPDATE Numbers SET number = number + 1 WHERE username = '" + req.username + "'"
+                }
+
+                localUpdate.txHandle = req.txHandle
+
+                update@Database( localUpdate )()
             }
-            executeQuery@TransactionService( userExistsQuery )( userExists )
+
+            scope (UpdateOutbox){
+                with ( updateServiceCRequest ){
+                    .username = req.username
+                }
+                with ( outboxQuery ){
+                        .txHandle = req.txHandle;
+                        .topic = config.kafkaOutboxOptions.topic;
+                        .operation = "finalizeChoreography"
+                }
                 
-            // Construct query which updates local state:
-            if (#userExists.row < 1)
-            {
-                localUpdate.update = "INSERT INTO Numbers VALUES ('" + req.username + "', 0);"
-            } 
-            else
-            {
-                localUpdate.update = "UPDATE Numbers SET number = number + 1 WHERE username = '" + req.username + "'"
+                getJsonString@JsonUtils( updateServiceCRequest )( outboxQuery.data )
+
+                updateOutbox@IBOB( outboxQuery )( updateResponse )
+                println@Console("Service B has updated locally")()
             }
-
-            localUpdate.handle = req.handle
-
-            executeUpdate@TransactionService( localUpdate )()
-
-            with ( updateServiceCRequest ){
-                .username = req.username
-            }
-            with ( outboxQuery ){
-                    .tHandle = req.handle;
-                    .topic = config.kafkaOutboxOptions.topic;
-                    .operation = "finalizeChoreography"
-            }
-            getJsonString@JsonUtils( updateServiceCRequest )( outboxQuery.data )
-
-            updateOutbox@IBOB( outboxQuery )( updateResponse )
-            println@Console("Service B has updated locally")()
             res = "Service B has updated locally"
         }]
     }

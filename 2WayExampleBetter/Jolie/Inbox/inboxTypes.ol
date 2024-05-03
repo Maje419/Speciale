@@ -29,7 +29,7 @@ type InboxConfig: void {
     .ibobLocation[0,1]: any
     .externalLocation[0,1]: string
     .databaseConnectionInfo : any {?}    // This should really be of type ConnectionInfo, but cannot make it work with imports
-    .transactionServiceLocation: any
+    .databaseServiceLocation: any
     .kafkaPollOptions: PollOptions
     .kafkaInboxOptions: KafkaOptions
 }

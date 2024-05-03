@@ -1,11 +1,11 @@
 type UpdateNumberRequest {
     .username : string
-    .handle[0, 1] : string
+    .txHandle[0, 1] : long
 }
 
 type FinalizeChoreographyRequest {
     .username: string
-    .handle[0,1]: string
+    .txHandle[0,1]: long
 }
 
 type UpdateNumberResponse: string
@@ -13,12 +13,12 @@ type UpdateNumberResponse: string
 
 interface ServiceAInterfaceExternal{
     RequestResponse:
-        updateNumber( UpdateNumberRequest )( UpdateNumberResponse )
+        startChoreography( UpdateNumberRequest )( UpdateNumberResponse )
 }
 
 interface ServiceAInterfaceLocal{
     RequestResponse:
-        updateNumber( UpdateNumberRequest )( UpdateNumberResponse )
+        startChoreography( UpdateNumberRequest )( UpdateNumberResponse )
     OneWay:
         finalizeChoreography( FinalizeChoreographyRequest )
 }

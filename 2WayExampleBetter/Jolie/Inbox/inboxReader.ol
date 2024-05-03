@@ -1,4 +1,4 @@
-from database import Database
+from database import DatabaseInterface
 from json-utils import JsonUtils
 from reflection import Reflection
 from time import Time
@@ -6,7 +6,6 @@ from console import Console
 
 from .inboxTypes import InboxConfig, InboxReaderInterface
 from ..ServiceA.serviceAInterface import ServiceAInterfaceLocal
-from ..TransactionService.transactionService import TransactionServiceOperations
 
 interface InboxReaderInterface {
     OneWay: 
@@ -17,7 +16,6 @@ service InboxReaderService (p: InboxConfig){
     execution: concurrent
 
     embed Console as Console
-    embed Database as Database
     embed JsonUtils as JsonUtils
     embed Reflection as Reflection
     embed Time as Time
@@ -34,21 +32,22 @@ service InboxReaderService (p: InboxConfig){
             ServiceAInterfaceLocal
     }
 
-    outputPort TransactionService 
+    outputPort Database 
     {
         Location: "local"   // Overwritten in init
         Protocol: http{
             format = "json"
         }
-        Interfaces: TransactionServiceOperations
+        Interfaces: DatabaseInterface
     }
 
     init 
     {
         // This service will forward calls to its embedder service from the inbox
         Embedder.location << p.localLocation
-        TransactionService.location << p.transactionServiceLocation
+        Database.location << p.databaseServiceLocation
         connect@Database( p.databaseConnectionInfo )()
+
         scope ( AwaitInboxTableCreation ){
             tableCreated = false;
             while (!tableCreated){
@@ -73,22 +72,22 @@ service InboxReaderService (p: InboxConfig){
             for ( row in queryResponse.row )
             {
                 // Initialize a new transaction to pass onto Service A
-                initializeTransaction@TransactionService()(tHandle)
+                beginTx@Database()(txHandle)
 
                 // Within this new transaction, update the current message as read
                 with( updateRequest )
                 {
-                    .handle = tHandle;
+                    .txHandle = txHandle;
                     .update = "DELETE FROM inbox WHERE arrivedFromKafka = " + row.arrivedfromkafka + 
                             " AND messageId = '" + row.messageid + "';"
                 }
 
-                executeUpdate@TransactionService( updateRequest )()
+                update@Database( updateRequest )()
                 
                 // The operation request is stored in the "parameters" column
                 getJsonValue@JsonUtils( row.parameters )( parameters )
                 println@Console("Parameters username: " + parameters.username)()
-                parameters.handle = tHandle
+                parameters.txHandle = txHandle
 
                 // Call the corresponding operation at the embedder service
                 with( embedderInvokationRequest )
@@ -99,21 +98,26 @@ service InboxReaderService (p: InboxConfig){
                 }
 
                 scope ( CatchUserFault ){
-                    println@Console("InboxReader trying to catch user fault")()
                     install (default => {
-                        commit@TransactionService( tHandle )()
+                        println@Console("InboxReader trying to catch user fault")()
+                        rollbackTx@Database( txHandle )()
+
+                        // At this point, the inbox could enter a 'Hey, something went wrong with this message' message into Kafka
+                        // instead of simply retrying
+
                         scheduleTimeout@Time( 1000{
                             operation = "beginReading"
                         } )(  )
                     })
 
+
                     invokeRRUnsafe@Reflection( embedderInvokationRequest )()
-                    commit@TransactionService( tHandle )( ret )
+                    commitTx@Database( txHandle )( ret )
                 }
             }
 
             scheduleTimeout@Time( 1000{
-                            operation = "beginReading"
+                operation = "beginReading"
             } )(  )
         }
     }

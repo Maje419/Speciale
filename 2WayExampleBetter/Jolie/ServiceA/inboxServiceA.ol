@@ -31,11 +31,11 @@ service InboxServiceA (p: InboxConfig){
 
     main
     {
-        [ updateNumber( req )( res )
+        [ startChoreography( req )( res )
         {
             with( inboxMessage )
             {
-                .operation = "updateNumber";
+                .operation = "startChoreography";
                 .request << req
             }
 

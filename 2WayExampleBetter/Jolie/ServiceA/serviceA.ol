@@ -6,7 +6,6 @@ from json-utils import JsonUtils
 
 from .serviceAInterface import ServiceAInterfaceLocal
 from ..Outbox.outboxService import OutboxInterface
-from ..TransactionService.transactionService import TransactionService
 
 service ServiceA{
     execution: concurrent
@@ -29,10 +28,10 @@ service ServiceA{
         Interfaces: OutboxInterface
     }
 
-    embed File as File
     embed Console as Console
+    embed Database as Database
+    embed File as File
     embed JsonUtils as JsonUtils
-    embed TransactionService as TransactionService
     embed Runtime as Runtime
 
     init
@@ -51,7 +50,7 @@ service ServiceA{
             .localLocation << location;
             .externalLocation << "socket://localhost:8080";       //This doesn't work (yet)
             .databaseConnectionInfo << config.serviceAConnectionInfo;
-            .transactionServiceLocation << TransactionService.location;   // All embedded services must talk to the same instance of 'TransactionServie'
+            .databaseServiceLocation << Database.location;   // All embedded services must talk to the same instance of 'DatabaseService'
             .kafkaPollOptions << config.pollOptions;
             .kafkaInboxOptions << config.kafkaInboxOptions
         }
@@ -60,9 +59,8 @@ service ServiceA{
             .pollSettings << config.pollOptions;
             .databaseConnectionInfo << config.serviceAConnectionInfo;
             .brokerOptions << config.kafkaOutboxOptions;
-            .transactionServiceLocation << TransactionService.location
+            .databaseServiceLocation << Database.location
         }
-
 
         loadEmbeddedService@Runtime({
             filepath = "InboxOutbox/ibob.ol"
@@ -73,39 +71,25 @@ service ServiceA{
         })(IBOB.location)
 
         inboxConfig.ibobLocation = IBOB.location
+
         loadEmbeddedService@Runtime({
             filepath = "ServiceA/inboxServiceA.ol"
             params << inboxConfig
         })(InboxService.location)
                 
-        // Connect the TransactionService to the database 
-        connect@TransactionService( config.serviceAConnectionInfo )( void )
-
-        scope ( createTable )  // Create the table containing the 'state' of service A
-        {   
-            
-            // Start a transaction, and get the associated transaction handle
-            initializeTransaction@TransactionService()( tHandle )
-
-            with ( createTableRequest ){
-                .update = "CREATE TABLE IF NOT EXISTS Numbers(username VARCHAR(50) NOT NULL, " +
-                "number int)";
-                .handle = tHandle
-            }
-            
-            // Create the table 
-            executeUpdate@TransactionService( createTableRequest )( createTableResponse )
-            commit@TransactionService( tHandle )( )
-        }
+        connect@Database( config.serviceAConnectionInfo )( void )
+        update@Database("CREATE TABLE IF NOT EXISTS Numbers(username VARCHAR(50) NOT NULL, " +
+            "number int)")()
     }
 
     main {
-        [ updateNumber( req )( res )
+        [ startChoreography( req )( res )
         {
             // If the handle is not defined, the message was recieved from a Jolie service which is not the InboxReader
-            //  We can therefore initiate a new transaction here, and be sure that we're not duplicating an update
-            if (!is_defined(req.handle)){
-                initializeTransaction@TransactionService()(req.handle)
+            //  We can therefore initiate a new transaction here, and be sure that we're not duplicating an update.
+            // Used only in testing.
+            if (!is_defined(req.txHandle)){
+                beginTx@Database()(req.txHandle)
             }
 
             scope ( UpdateLocalState )    //Update the local state of Service A
@@ -113,26 +97,25 @@ service ServiceA{
                 // Check if the user exists, or if it needs to be created
                 with ( userExistsQuery ){
                     .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "';";
-                    .handle = req.handle
+                    .txHandle = req.txHandle
                 }
-                executeQuery@TransactionService( userExistsQuery )( userExists )
+                query@Database( userExistsQuery )( userExists )
                 
                 // Create user if needed, otherwise update the number for the user
-                updateQuery.handle = req.handle
+                updateQuery.txHandle = req.txHandle
                 if (#userExists.row < 1){
                     updateQuery.update = "INSERT INTO Numbers VALUES ('" + req.username + "', 0);"
                 } else{
                     updateQuery.update = "UPDATE Numbers SET number = number + 1 WHERE username = '" + req.username + "'"
                 }
-                executeUpdate@TransactionService( updateQuery )( updateResponse )
+                update@Database( updateQuery )( updateResponse )
 
                 // To update Service B, this service needs to communicate to its outbox that it should put a message
                 // into kafka containing the operation and the request that we seek to call at                
                 with ( outboxQuery ){
-                    .tHandle = req.handle;                          // The transaction handle for the ongoing transaction
-                    .commitTransaction = true;                      // No other updates should come to this transaction, so commit it.
-                    .topic = config.kafkaOutboxOptions.topic;       // .topic = "a-out", which is where service B inbox listens
-                    .operation = "numbersUpdated"                   // This service wants to call serviceB.numbersUpdated
+                    .txHandle = req.txHandle;                           // The transaction handle for the ongoing transaction
+                    .topic = config.kafkaOutboxOptions.topic;           // .topic = "a-out", which is where service B inbox listens
+                    .operation = "react"                                // This service wants to call serviceB.numbersUpdated
                 }
 
                 // Parse the request that was supposed to be sent to serviceB into a json string, and enter it into the kafak message.value
