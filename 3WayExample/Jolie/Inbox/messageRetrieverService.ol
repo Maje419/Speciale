@@ -56,7 +56,6 @@ service MessageRetriever(p: MRSEmbeddingConfig) {
         scheduleTimeout@Time( 500{
             operation = "beginReading"
         } )(  )
-        println@Console( "MessageRetriever Initialized" )(  )
     }
 
     main

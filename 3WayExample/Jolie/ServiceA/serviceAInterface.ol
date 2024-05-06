@@ -1,19 +1,19 @@
-type UpdateNumberRequest {
+type StartChoreographyRequest {
     .username: string
-    .handle*: string
+    .txHandle*: long
 }
 
 type FinalizeChoreographyRequest {
     .username: string
-    .handle: string
+    .txHandle*: long
 }
 
-type UpdateNumberResponse: string
+type StartChoreographyResponse: string
 
 
 interface ServiceAInterfaceExternal{
     RequestResponse:
-        updateNumber( UpdateNumberRequest )( UpdateNumberResponse )
+        startChoreography( StartChoreographyRequest )( StartChoreographyResponse )
 }
 
 interface ServiceAInterfaceLocal{

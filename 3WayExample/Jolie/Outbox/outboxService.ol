@@ -1,11 +1,10 @@
 
 from .outboxTypes import OutboxConfig, UpdateOutboxRequest, StatusResponse
 from .messageForwarderService import MessageForwarderInterface
-from ..TransactionService.transactionService import TransactionServiceOperations
 
 from runtime import Runtime
 from console import Console
-from database import Database
+from database import DatabaseInterface
 from string_utils import StringUtils
 from time import Time
 
@@ -39,33 +38,25 @@ service OutboxService(p: OutboxConfig){
     }
 
     /** This port is used to talk to the transaction service */
-    outputPort TransactionService {
+    outputPort Database {
         Location: "local"   // Overwritten in init
-        Interfaces: TransactionServiceOperations
+        Interfaces: DatabaseInterface
     }
 
     embed Runtime as Runtime
     embed Time as Time
     embed Console as Console
-    embed Database as Database
 
     init {
         // Insert location of the transaction service embedded in main service
-        TransactionService.location << p.transactionServiceLocation
+        Database.location << p.databaseServiceLocation
 
         // Load MFS
-        with (MFSParams){
-            .databaseConnectionInfo << p.databaseConnectionInfo;
-            .pollSettings << p.pollSettings;
-            .columnSettings.keyColumn = "kafkaKey";
-            .columnSettings.valueColumn = "kafkaValue";
-            .columnSettings.idColumn = "mid";
-            .brokerOptions << p.brokerOptions
-        }
         loadEmbeddedService@Runtime({
             filepath = "messageForwarderService.ol"
             params << {
                 .databaseConnectionInfo << p.databaseConnectionInfo;
+                .databaseServiceLocation << p.databaseServiceLocation;
                 .pollSettings << p.pollSettings;
                 .columnSettings.keyColumn = "kafkaKey";
                 .columnSettings.valueColumn = "kafkaValue";
@@ -75,21 +66,12 @@ service OutboxService(p: OutboxConfig){
         })( MFS.location )
 
         // Connect to the database
-        connect@Database( p.databaseConnectionInfo )( void )
-        scope ( createMessagesTable )
-        {
-            install ( SQLException => { println@Console("Error when creating the outbox table for the outbox!")() })
-
-            // Varchar size is not enforced by sqlite, we can insert a string of any length
-            createTableRequest = "CREATE TABLE IF NOT EXISTS outbox (kafkaKey TEXT, kafkaValue TEXT, mid TEXT UNIQUE);"
-            update@Database( createTableRequest )( ret )
-        }
+        update@Database( "CREATE TABLE IF NOT EXISTS outbox (kafkaKey TEXT, kafkaValue TEXT, mid TEXT UNIQUE);" )( ret )
     }
     
     main {
         [updateOutbox( req )( res ){
             install (ConnectionError => {
-                println@Console("Call to update before connecting")();
                 res.message = "Call to update before connecting!";
                 res.success = false
             })
@@ -103,12 +85,13 @@ service OutboxService(p: OutboxConfig){
             updateMessagesTableQuery = "INSERT INTO outbox (kafkaKey, kafkaValue, mid) VALUES ('" + req.operation + "', '" + req.data + "', '" + messageId + "');" 
             
             with ( updateRequest ){
-                .handle = req.tHandle;
+                .txHandle = req.txHandle;
                 .update = updateMessagesTableQuery
             }
 
-            executeUpdate@TransactionService( updateRequest )( updateResponse )
+            update@Database( updateRequest )( updateResponse )
             
+            println@Console("Outbox: Updated outbox with key: " + req.operation)()
             res.message = "Outbox updated"
             res.success = true
         }]

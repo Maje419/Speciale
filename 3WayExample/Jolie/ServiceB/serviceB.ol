@@ -6,7 +6,6 @@ from json-utils import JsonUtils
 
 from .serviceBInterface import ServiceBInterface
 from ..Outbox.outboxService import OutboxInterface
-from ..TransactionService.transactionService import TransactionService
 
 service ServiceB{
     execution: concurrent
@@ -32,7 +31,6 @@ service ServiceB{
     embed File as File
     embed JsonUtils as JsonUtils
     embed Runtime as Runtime
-    embed TransactionService as TransactionService
 
     init {
         readFile@File(
@@ -41,13 +39,16 @@ service ServiceB{
                 format = "json"
             }) ( config )
 
+        connect@Database( config.serviceBConnectionInfo )( )
+        update@Database( "CREATE TABLE IF NOT EXISTS numbers(username VARCHAR(50) NOT null, number INT)" )( ret )
+        
         getLocalLocation@Runtime()( location )
         with( inboxConfig )
         { 
             .localLocation << location;
             .externalLocation << "socket://localhost:8080";       //This doesn't work (yet)
             .databaseConnectionInfo << config.serviceBConnectionInfo;
-            .transactionServiceLocation << TransactionService.location;   // All embedded services must talk to the same instance of 'TransactionServie'
+            .databaseServiceLocation << Database.location;   // All embedded services must talk to the same instance of 'TransactionServie'
             .kafkaPollOptions << config.pollOptions;
             .kafkaInboxOptions << config.kafkaInboxOptions
         }
@@ -56,7 +57,7 @@ service ServiceB{
             .pollSettings << config.pollOptions;
             .databaseConnectionInfo << config.serviceBConnectionInfo;
             .brokerOptions << config.kafkaOutboxOptions;
-            .transactionServiceLocation << TransactionService.location
+            .databaseServiceLocation << Database.location
         }
 
         loadEmbeddedService@Runtime({
@@ -67,27 +68,18 @@ service ServiceB{
                 }
         })(IBOB.location)
         inboxConfig.ibobLocation = IBOB.location
-
-        connect@TransactionService(config.serviceBConnectionInfo)()
-        connect@Database( config.serviceBConnectionInfo )( )
-
-        scope ( createtable ) 
-        {
-            updaterequest = "CREATE TABLE IF NOT EXISTS numbers(username VARCHAR(50) NOT null, number INT)"
-            update@Database( updaterequest )( ret )
-        }
     }
 
     main 
     {
-        [numbersUpdated( req )()
+        [react( req )()
         {   
-            println@Console("ServiceB: \tupdateNumber called for user " + req.username)()
+            println@Console("Recieved message for operation react!")()
             with ( userExistsQuery ){
                 .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "'";
-                .handle = req.handle
+                .txHandle = req.txHandle
             }
-            executeQuery@TransactionService( userExistsQuery )( userExists )
+            query@Database( userExistsQuery )( userExists )
                 
             // Construct query which updates local state:
             if (#userExists.row < 1)
@@ -99,22 +91,21 @@ service ServiceB{
                 localUpdate.update = "UPDATE Numbers SET number = number + 1 WHERE username = '" + req.username + "'"
             }
 
-            localUpdate.handle = req.handle
+            localUpdate.txHandle = req.txHandle
 
-            executeUpdate@TransactionService( localUpdate )()
+            update@Database( localUpdate )()
 
             with ( updateServiceCRequest ){
                 .username = req.username
             }
             with ( outboxQuery ){
-                    .tHandle = req.handle;
+                    .txHandle = req.txHandle;
                     .topic = config.kafkaOutboxOptions.topic;
-                    .operation = "updateNumbers"
+                    .operation = "react"
             }
             getJsonString@JsonUtils( updateServiceCRequest )( outboxQuery.data )
 
             updateOutbox@IBOB( outboxQuery )( updateResponse )
-            println@Console("ServiceB: \tCompleted local update for  " + req.username)()
         }]
     }
 }

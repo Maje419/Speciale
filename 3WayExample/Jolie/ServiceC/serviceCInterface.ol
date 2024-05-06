@@ -1,9 +1,9 @@
-type UpdateNumbersRequest{
+type ReactRequest{
     .username: string
-    .handle: string
+    .txHandle: long
 }
 
 interface ServiceCInterface{
     RequestResponse:
-        updateNumbers( UpdateNumbersRequest )( bool )
+        react( ReactRequest )( bool )
 }

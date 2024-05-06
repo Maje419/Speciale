@@ -6,7 +6,6 @@ from json-utils import JsonUtils
 
 from .serviceCInterface import ServiceCInterface
 from ..Outbox.outboxService import OutboxInterface
-from ..TransactionService.transactionService import TransactionService
 
 service ServiceC{
     execution: concurrent
@@ -32,7 +31,6 @@ service ServiceC{
     embed File as File
     embed JsonUtils as JsonUtils
     embed Runtime as Runtime
-    embed TransactionService as TransactionService
 
     init{
         readFile@File(
@@ -41,6 +39,9 @@ service ServiceC{
                 format = "json"
             }) ( config )
 
+        connect@Database( config.serviceCConnectionInfo )( )
+        update@Database( "CREATE TABLE IF NOT EXISTS numbers(username VARCHAR(50) NOT null, number INT)" )( ret )
+
         getLocalLocation@Runtime()( location )
 
         with( inboxConfig )
@@ -48,7 +49,7 @@ service ServiceC{
             .localLocation << location;
             .externalLocation << "socket://localhost:8080";       //This doesn't work (yet) - Idea was to be able to "hand over" control of taking incomming messages in a generic way
             .databaseConnectionInfo << config.serviceCConnectionInfo;
-            .transactionServiceLocation << TransactionService.location;   // All embedded services must talk to the same instance of 'TransactionServie'
+            .databaseServiceLocation << Database.location;   // All embedded services must talk to the same instance of 'TransactionServie'
             .kafkaPollOptions << config.pollOptions;
             .kafkaInboxOptions << config.kafkaInboxOptions
         }
@@ -57,7 +58,7 @@ service ServiceC{
             .pollSettings << config.pollOptions;
             .databaseConnectionInfo << config.serviceCConnectionInfo;
             .brokerOptions << config.kafkaOutboxOptions;
-            .transactionServiceLocation << TransactionService.location
+            .databaseServiceLocation << Database.location
         }
 
         loadEmbeddedService@Runtime({
@@ -67,28 +68,18 @@ service ServiceC{
                 .outboxConfig << outboxConfig
                 }
         })(IBOB.location)
-        inboxConfig.ibobLocation = IBOB.location
-
-        connect@TransactionService(config.serviceCConnectionInfo)()
-        connect@Database( config.serviceCConnectionInfo )( )
-
-        scope ( createtable ) 
-        {
-            updaterequest = "CREATE TABLE IF NOT EXISTS numbers(username VARCHAR(50) NOT null, number INT)"
-            update@Database( updaterequest )( ret )
-        }
     }
 
     main
     {
-        [updateNumbers( req )( res ){
-            println@Console("ServiceC: \tupdateNumber called for user " + req.username)()
+        [react( req )( res ){
+            println@Console("Recieved message for operation react!")()
             // Once a request is recieved, we update our own local state for that person
             with ( userExistsQuery ){
                 .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "'";
-                .handle = req.handle
+                .txHandle = req.txHandle
             }
-            executeQuery@TransactionService( userExistsQuery )( userExists )
+            query@Database( userExistsQuery )( userExists )
                 
             // Construct query which updates local state:
             if (#userExists.row < 1)
@@ -100,8 +91,8 @@ service ServiceC{
                 localUpdate.update = "UPDATE Numbers SET number = number + 1 WHERE username = '" + req.username + "'"
             }
             
-            localUpdate.handle = req.handle
-            executeUpdate@TransactionService( localUpdate )()
+            localUpdate.txHandle = req.txHandle
+            update@Database( localUpdate )()
 
             // Send to our outbox that we've completed our update
             with ( finalizeServiceARequest ){
@@ -109,7 +100,7 @@ service ServiceC{
             }
 
             with ( outboxQuery ){
-                    .tHandle = req.handle;
+                    .txHandle = req.txHandle;
                     .topic = config.kafkaOutboxOptions.topic;
                     .operation = "finalizeChoreography"
             }
@@ -118,7 +109,6 @@ service ServiceC{
             updateOutbox@IBOB( outboxQuery )( updateResponse )
             
             res = true
-            println@Console("ServiceC: \tCompleted local update for  " + req.username)()
         }]
     }
 }

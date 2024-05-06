@@ -28,11 +28,11 @@ service InboxServiceA (p: InboxConfig){
     {
         // This operation is the only one which can be called from outside local, which means
         // it needs to be defined here.
-        [ updateNumber( req )( res )
+        [ startChoreography( req )( res )
         {
             with( inboxMessage )
             {
-                .operation = "updateNumber";
+                .operation = "startChoreography";
                 .request << req
             }
             

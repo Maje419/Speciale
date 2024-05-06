@@ -14,7 +14,7 @@ type PollSettings: void{
 
 /** A request to insert some message into the outbox */
 type UpdateOutboxRequest{
-    .tHandle: string                                //< The transaction handle
+    .txHandle: long                                 //< The transaction handle
     .operation: string                              //< The operation to be called on the receiver service
     .data: string                                   //< A json representation of the request to pass to .operation
     .topic: string                                  //< The kafka topic on which the update should be broadcast
@@ -25,7 +25,7 @@ type OutboxConfig{
     .databaseConnectionInfo: ConnectionInfo             //< The connectioninfo used to connect to the database. See docs the Database module.
     .pollSettings: PollSettings                         //< Object of type PollSettings descibing the desired behaviour of the MessageForwarder
     .brokerOptions: KafkaOptions                        //< Object of type KafkaOptions describing the intended configuration for the producer
-    .transactionServiceLocation: any                    //< The location of the transaction service
+    .databaseServiceLocation: any                       //< The location of the DatabaseService which the outbox will use
 }
 
 /** A response object for messages being inserted into kafka */
@@ -45,6 +45,7 @@ type ColumnSettings {
 /** Parameters allowing for configuring the functionality of the MFS */
 type MFSParams{
     .databaseConnectionInfo: ConnectionInfo         //< Which database should be used for the outbox table
+    .databaseServiceLocation: any                   //< The location of the DatabaseService instance to be used
     .pollSettings: PollSettings                     //< Which settings the MFS should use when polling the outbox table
     .columnSettings: ColumnSettings                 //< Information about the columns of the outbox table
     .brokerOptions: KafkaOptions                    //< Information about which kafka broker should be written to

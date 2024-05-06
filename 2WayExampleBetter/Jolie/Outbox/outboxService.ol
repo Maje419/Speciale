@@ -53,13 +53,7 @@ service OutboxService(p: OutboxConfig){
             }
         })( MFS.location )
 
-        scope ( createMessagesTable )
-        {
-            install ( SQLException => { println@Console("Error when creating the outbox table for the outbox!")() })
-
-            // Varchar size is not enforced by sqlite, we can insert a string of any length
-            update@Database( "CREATE TABLE IF NOT EXISTS outbox (kafkaKey TEXT, kafkaValue TEXT, mid TEXT UNIQUE);" )( ret )
-        }
+        update@Database( "CREATE TABLE IF NOT EXISTS outbox (kafkaKey TEXT, kafkaValue TEXT, mid TEXT UNIQUE);" )( ret )
     }
     
     main {

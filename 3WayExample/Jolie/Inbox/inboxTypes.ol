@@ -28,7 +28,7 @@ type InboxConfig: void {
     .ibobLocation[0,1]: any             //< The location of the InboxOutbox service
     .externalLocation[0,1]: string      //< Doesn't work yet, still TODO
     .databaseConnectionInfo : any {?}   //< An object of type ConnectionInfo which is used to connect to a database
-    .transactionServiceLocation: any    //< The location of the Transaction Service
+    .databaseServiceLocation: any       //< The location of the DatabaseService for the inbox to use
     .kafkaPollOptions: PollOptions      //< Which options should be used when reading messages from Kafka
     .kafkaInboxOptions: KafkaOptions    //< Configuration needed for initializing the KafkaConsumer
 }
