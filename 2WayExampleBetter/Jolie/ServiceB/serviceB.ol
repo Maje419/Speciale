@@ -38,6 +38,9 @@ service ServiceB{
 
         getLocalLocation@Runtime()( location )
 
+        connect@Database( config.serviceBConnectionInfo )( )
+        update@Database( "CREATE TABLE IF NOT EXISTS numbers(username VARCHAR(50) NOT null, number INT)" )( ret )
+
         with( inboxConfig )
         { 
             .localLocation << location;
@@ -61,13 +64,6 @@ service ServiceB{
                 .outboxConfig << outboxConfig
                 }
         })(IBOB.location)
-
-        connect@Database( config.serviceBConnectionInfo )( )
-
-        scope ( createtable ) 
-        {
-            update@Database( "CREATE TABLE IF NOT EXISTS numbers(username VARCHAR(50) NOT null, number INT)" )( ret )
-        }
     }
 
     main 

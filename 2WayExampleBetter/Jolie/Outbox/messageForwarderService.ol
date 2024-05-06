@@ -3,7 +3,7 @@ from .kafka-inserter import KafkaInserter
 
 from json-utils import JsonUtils
 from time import Time
-from database import Database
+from database import DatabaseInterface
 from console import Console
 
 
@@ -23,17 +23,23 @@ service MessageForwarderService(p: MFSParams){
         Interfaces: MessageForwarderInterface
     }
 
+    outputPort Database {
+        Location: "local" // Overwritten in init
+        Protocol: http{
+            format="json"
+        }
+        Interfaces: DatabaseInterface
+    }
+
     embed KafkaInserter as KafkaInserter
     embed Time as Time
-    embed Database as Database
     embed Console as Console
     embed JsonUtils as JsonUtils
 
 
     // Starts this service reading continually from the 'outbox' table
     init {
-        connect@Database( p.databaseConnectionInfo )( void )
-
+        Database.location = p.databaseServiceLocation
         scheduleTimeout@Time( 1000{
                 operation = "startReadingMessages"
         } )(  )

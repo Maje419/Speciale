@@ -43,18 +43,25 @@ service ServiceA{
                 format = "json"
             }) ( config )
 
-        getLocalLocation@Runtime()(location)
+        // Connect to the database service initiates connectionpool
+        connect@Database( config.serviceAConnectionInfo )( void )
+        update@Database("CREATE TABLE IF NOT EXISTS Numbers(username VARCHAR(50) NOT NULL, " +
+            "number int)")()
 
+        // Store the location of this service in a variable
+        getLocalLocation@Runtime()(location)
+        
+        // Configuration parameters needed for the inbox service(s)
         with( inboxConfig )
         { 
             .localLocation << location;
-            .externalLocation << "socket://localhost:8080";       //This doesn't work (yet)
             .databaseConnectionInfo << config.serviceAConnectionInfo;
             .databaseServiceLocation << Database.location;   // All embedded services must talk to the same instance of 'DatabaseService'
             .kafkaPollOptions << config.pollOptions;
             .kafkaInboxOptions << config.kafkaInboxOptions
         }
 
+        // Configuration parameters needed for the outbox service(s)
         with ( outboxConfig ){
             .pollSettings << config.pollOptions;
             .databaseConnectionInfo << config.serviceAConnectionInfo;
@@ -62,6 +69,7 @@ service ServiceA{
             .databaseServiceLocation << Database.location
         }
 
+        // Load the InboxOutbox library as an embedded service
         loadEmbeddedService@Runtime({
             filepath = "InboxOutbox/ibob.ol"
             params << { 
@@ -72,14 +80,11 @@ service ServiceA{
 
         inboxConfig.ibobLocation = IBOB.location
 
+        // Load the self-written inboxServiceA to store incomming messages
         loadEmbeddedService@Runtime({
             filepath = "ServiceA/inboxServiceA.ol"
             params << inboxConfig
         })(InboxService.location)
-                
-        connect@Database( config.serviceAConnectionInfo )( void )
-        update@Database("CREATE TABLE IF NOT EXISTS Numbers(username VARCHAR(50) NOT NULL, " +
-            "number int)")()
     }
 
     main {

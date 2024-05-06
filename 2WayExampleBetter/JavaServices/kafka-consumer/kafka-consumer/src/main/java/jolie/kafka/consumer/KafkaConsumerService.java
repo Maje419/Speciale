@@ -66,7 +66,6 @@ public class KafkaConsumerService extends JavaService {
      *              response form Kafka
      */
     public Value consume(Value input) {
-        System.out.println("KafkaConsumer: Consume called");
         long timeout = input.getFirstChild("timeoutMs").longValue();
         ConsumerRecords<String, String> records = null;
 
@@ -76,7 +75,6 @@ public class KafkaConsumerService extends JavaService {
                 response.getFirstChild("status").setValue(0);
                 records = consumer.poll(Duration.ofMillis(timeout));
             } else {
-                System.out.println("Consumer not initialized!");
                 response.getFirstChild("status").setValue(1);
             }
 
@@ -114,7 +112,6 @@ public class KafkaConsumerService extends JavaService {
         long offset = input.getFirstChild("offset").longValue() + 1; // +1 since we're committing what the offset of the
                                                                      // NEXT message
 
-        System.out.println("KafkaConsumer: Commit called for offset" + offset);
         TopicPartition par = consumer.assignment().iterator().next();
         try {
             synchronized (lock) {
@@ -123,7 +120,6 @@ public class KafkaConsumerService extends JavaService {
                 consumer.seek(par, offset);
 
                 consumer.commitSync();
-                System.out.println("KafkaConsumer: Finished committing" + offset);
 
             }
             response.getFirstChild("reason").setValue("Committed offset " + offset + " for topic " + topic);

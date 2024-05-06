@@ -44,7 +44,7 @@ service OutboxService(p: OutboxConfig){
         loadEmbeddedService@Runtime({
             filepath = "messageForwarderService.ol"
             params << {
-                .databaseConnectionInfo << p.databaseConnectionInfo;
+                .databaseServiceLocation << p.databaseServiceLocation;
                 .pollSettings << p.pollSettings;
                 .columnSettings.keyColumn = "kafkaKey";
                 .columnSettings.valueColumn = "kafkaValue";
@@ -53,14 +53,12 @@ service OutboxService(p: OutboxConfig){
             }
         })( MFS.location )
 
-        connect@Database( p.databaseConnectionInfo )( void )
         scope ( createMessagesTable )
         {
             install ( SQLException => { println@Console("Error when creating the outbox table for the outbox!")() })
 
             // Varchar size is not enforced by sqlite, we can insert a string of any length
-            createTableRequest = "CREATE TABLE IF NOT EXISTS outbox (kafkaKey TEXT, kafkaValue TEXT, mid TEXT UNIQUE);"
-            update@Database( createTableRequest )( ret )
+            update@Database( "CREATE TABLE IF NOT EXISTS outbox (kafkaKey TEXT, kafkaValue TEXT, mid TEXT UNIQUE);" )( ret )
         }
     }
     

@@ -46,7 +46,6 @@ service InboxReaderService (p: InboxConfig){
         // This service will forward calls to its embedder service from the inbox
         Embedder.location << p.localLocation
         Database.location << p.databaseServiceLocation
-        connect@Database( p.databaseConnectionInfo )()
 
         scope ( AwaitInboxTableCreation ){
             tableCreated = false;
@@ -65,10 +64,12 @@ service InboxReaderService (p: InboxConfig){
     main
     {
         [beginReading()]{
+            // Read any messages left in the 'inbox' table
             query@Database("SELECT * FROM inbox;")( queryResponse );
             for ( row in queryResponse.row )
             {
                 println@Console("Inbox: Reading and processing message for operation " + row.key )()
+                
                 // Initialize a new transaction to pass onto Service A
                 beginTx@Database()(txHandle)
 
@@ -86,14 +87,6 @@ service InboxReaderService (p: InboxConfig){
                 getJsonValue@JsonUtils( row.parameters )( parameters )
                 parameters.txHandle = txHandle
 
-                // Call the corresponding operation at the embedder service
-                with( embedderInvokationRequest )
-                {
-                    .outputPort = "Embedder";
-                    .data << parameters;
-                    .operation = row.operation
-                }
-
                 scope ( CatchUserFault ){
                     install (default => {
                         rollbackTx@Database( txHandle )()
@@ -105,6 +98,14 @@ service InboxReaderService (p: InboxConfig){
                             operation = "beginReading"
                         } )(  )
                     })
+
+                    // Call the corresponding operation at the embedder service
+                    with( embedderInvokationRequest )
+                    {
+                        .outputPort = "Embedder";
+                        .data << parameters;
+                        .operation = row.operation
+                    }
 
                     invokeRRUnsafe@Reflection( embedderInvokationRequest )()
                     commitTx@Database( txHandle )( ret )

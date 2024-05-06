@@ -38,7 +38,7 @@ type ColumnSettings {
 }
 
 type MFSParams{
-    .databaseConnectionInfo: ConnectionInfo
+    .databaseServiceLocation: any
     .pollSettings: PollSettings
     .columnSettings: void{
         .keyColumn: string
