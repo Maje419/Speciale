@@ -7,7 +7,6 @@
     "host": ""
   },
   "pollOptions": {
-    "pollDurationMS": 3000,
     "pollAmount": 3
   },
   "kafkaInboxOptions": {

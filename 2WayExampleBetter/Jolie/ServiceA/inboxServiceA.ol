@@ -2,11 +2,9 @@ from runtime import Runtime
 from console import Console
 
 from .serviceAInterface import ServiceAInterfaceExternal
-from ..Inbox.inboxTypes import InboxConfig
-from ..Inbox.inboxWriter import InboxWriterExternalInterface, InboxWriterService
-from ..Inbox.inboxReader import InboxReaderService
+from ..InboxOutbox.publicInboxTypes import IbobLocation, InboxWriterExternalInterface
 
-service InboxServiceA (p: InboxConfig){
+service InboxServiceA (p: IbobLocation){
     execution: concurrent
 
     inputPort ServiceAExternal {
@@ -26,7 +24,7 @@ service InboxServiceA (p: InboxConfig){
     embed Runtime as Runtime
     
     init {
-        IBOB.location = p.ibobLocation
+        IBOB.location = p
     }
 
     main

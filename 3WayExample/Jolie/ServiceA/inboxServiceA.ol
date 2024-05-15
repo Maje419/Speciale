@@ -1,9 +1,8 @@
 from .serviceAInterface import ServiceAInterfaceExternal
-from ..Inbox.inboxTypes import InboxConfig
-from ..Inbox.inboxWriter import InboxWriterExternalInterface
+from ..InboxOutbox.publicInboxTypes import IbobLocation, InboxWriterExternalInterface
 
 // Defining the service. InboxConfig must be defined in the Embedder service, and passed when embedding.
-service InboxServiceA (p: InboxConfig){
+service InboxServiceA (p: IbobLocation){
     execution: concurrent
 
     // This port is what ServiceA used to listen on. This InboxService now takes ownership of it. 
@@ -21,7 +20,7 @@ service InboxServiceA (p: InboxConfig){
     }
 
     init {
-        IBOB.location = p.ibobLocation
+        IBOB.location << p
     }
 
     main

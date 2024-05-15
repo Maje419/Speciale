@@ -5,7 +5,7 @@ from runtime import Runtime
 from json-utils import JsonUtils
 
 from .serviceCInterface import ServiceCInterface
-from ..Outbox.outboxService import OutboxInterface
+from ..InboxOutbox.publicOutboxTypes import OutboxInterface
 
 service ServiceC{
     execution: concurrent
@@ -33,31 +33,40 @@ service ServiceC{
     embed Runtime as Runtime
 
     init{
-        readFile@File(
-            {
-                filename = "ServiceC/serviceCConfig.json"
-                format = "json"
-            }) ( config )
+        with ( connectionInfo ){
+            .username = "postgres"
+            .password = "example"
+            .database = "service-c-db"
+            .driver = "postgresql"
+            .host = ""
+        }
 
-        connect@Database( config.serviceCConnectionInfo )( )
+        with ( kafkaInboxOptions ){
+            .bootstrapServer = "localhost:29092"
+            .groupId = "service-c-inbox"
+            .topic = "b-out"
+        }
+        
+        with ( kafkaOutboxOptions ){
+                .topic = "c-out"
+                .bootstrapServer = "localhost:29092"
+        }
+
+        connect@Database( connectionInfo )( )
         update@Database( "CREATE TABLE IF NOT EXISTS numbers(username VARCHAR(50) NOT null, number INT)" )( ret )
 
         getLocalLocation@Runtime()( location )
 
-        with( inboxConfig )
-        { 
-            .localLocation << location;
-            .externalLocation << "socket://localhost:8080";       //This doesn't work (yet) - Idea was to be able to "hand over" control of taking incomming messages in a generic way
-            .databaseConnectionInfo << config.serviceCConnectionInfo;
-            .databaseServiceLocation << Database.location;   // All embedded services must talk to the same instance of 'TransactionServie'
-            .kafkaPollOptions << config.pollOptions;
-            .kafkaInboxOptions << config.kafkaInboxOptions
+        with( inboxConfig ){ 
+            .locations << {
+                .localLocation << location;
+                .databaseServiceLocation << Database.location
+            }
+            .kafkaOptions << kafkaInboxOptions
         }
 
         with ( outboxConfig ){
-            .pollSettings << config.pollOptions;
-            .databaseConnectionInfo << config.serviceCConnectionInfo;
-            .brokerOptions << config.kafkaOutboxOptions;
+            .brokerOptions << kafkaOutboxOptions;
             .databaseServiceLocation << Database.location
         }
 
@@ -101,10 +110,10 @@ service ServiceC{
 
             with ( outboxQuery ){
                     .txHandle = req.txHandle;
-                    .topic = config.kafkaOutboxOptions.topic;
+                    .topic = "c-out";
                     .operation = "finalizeChoreography"
             }
-            getJsonString@JsonUtils( finalizeServiceARequest )( outboxQuery.data )
+            getJsonString@JsonUtils( finalizeServiceARequest )( outboxQuery.parameters )
 
             updateOutbox@IBOB( outboxQuery )( updateResponse )
             

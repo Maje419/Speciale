@@ -25,6 +25,9 @@ public class KafkaRelayer extends JavaService {
         props.put("bootstrap.servers",
                 input.getFirstChild("brokerOptions").getFirstChild("bootstrapServer").strValue());
         props.put(
+                "group.id",
+                input.getFirstChild("brokerOptions").getFirstChild("groupId").strValue());
+        props.put(
                 "client.id",
                 input.getFirstChild("brokerOptions").getFirstChild("clientId").strValue());
 

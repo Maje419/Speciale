@@ -5,7 +5,7 @@ from runtime import Runtime
 from json-utils import JsonUtils
 
 from .serviceBInterface import ServiceBInterface
-from ..Outbox.outboxService import OutboxInterface
+from ..InboxOutbox.publicOutboxTypes import OutboxInterface
 
 service ServiceB{
     execution: concurrent
@@ -33,33 +33,47 @@ service ServiceB{
     embed Runtime as Runtime
 
     init {
-        readFile@File(
-            {
-                filename = "ServiceB/serviceBConfig.json"
-                format = "json"
-            }) ( config )
+        with ( connectionInfo ){
+            .username = "postgres"
+            .password = "example"
+            .database = "service-b-db"
+            .driver = "postgresql"
+            .host = ""
+        }
 
-        connect@Database( config.serviceBConnectionInfo )( )
+        with ( kafkaInboxOptions ){
+            .bootstrapServer = "localhost:29092"
+            .groupId = "service-b-inbox"
+            .topic = "a-out"
+            .pollAmount = 3
+        }
+        
+        with ( kafkaOutboxOptions ){
+                .topic = "b-out"
+                .bootstrapServer = "localhost:29092"
+        }
+
+        connect@Database( connectionInfo )( )
         update@Database( "CREATE TABLE IF NOT EXISTS numbers(username VARCHAR(50) NOT null, number INT)" )( ret )
         
         getLocalLocation@Runtime()( location )
+
         with( inboxConfig )
         { 
-            .localLocation << location;
-            .externalLocation << "socket://localhost:8080";       //This doesn't work (yet)
-            .databaseConnectionInfo << config.serviceBConnectionInfo;
-            .databaseServiceLocation << Database.location;   // All embedded services must talk to the same instance of 'TransactionServie'
-            .kafkaPollOptions << config.pollOptions;
-            .kafkaInboxOptions << config.kafkaInboxOptions
+            .pollTimer = 10;
+            .locations << {
+                .localLocation << location;
+                .databaseServiceLocation << Database.location
+            }
+            .kafkaOptions << kafkaInboxOptions
         }
 
         with ( outboxConfig ){
-            .pollSettings << config.pollOptions;
-            .databaseConnectionInfo << config.serviceBConnectionInfo;
-            .brokerOptions << config.kafkaOutboxOptions;
+            .pollTimer = 10;
+            .brokerOptions << kafkaOutboxOptions;
             .databaseServiceLocation << Database.location
         }
-
+        
         loadEmbeddedService@Runtime({
             filepath = "InboxOutbox/ibob.ol"
             params << { 
@@ -67,7 +81,6 @@ service ServiceB{
                 .outboxConfig << outboxConfig
                 }
         })(IBOB.location)
-        inboxConfig.ibobLocation = IBOB.location
     }
 
     main 
@@ -100,10 +113,10 @@ service ServiceB{
             }
             with ( outboxQuery ){
                     .txHandle = req.txHandle;
-                    .topic = config.kafkaOutboxOptions.topic;
+                    .topic = "b-out";
                     .operation = "react"
             }
-            getJsonString@JsonUtils( updateServiceCRequest )( outboxQuery.data )
+            getJsonString@JsonUtils( updateServiceCRequest )( outboxQuery.parameters )
 
             updateOutbox@IBOB( outboxQuery )( updateResponse )
         }]
