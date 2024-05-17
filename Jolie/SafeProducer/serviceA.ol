@@ -1,19 +1,22 @@
-from database import Database, ConnectionInfo
+from database import Database
 from console import Console
 from time import Time
+from runtime import Runtime
+from json-utils import JsonUtils
 
-from .outboxService import Outbox
 
-type UpdateNumberRequest {
+from ..InboxOutbox.publicOutboxTypes import OutboxInterface
+
+type StartChoreographyRequest {
     .username : string
 }
 
-type UpdateNumberResponse: string
+type StartChoreographyResponse: string
 
 
 interface ServiceAInterface{
     RequestResponse:
-        updateNumber( UpdateNumberRequest )( UpdateNumberResponse ),
+        startChoreography( StartChoreographyRequest )( StartChoreographyResponse ),
 }
 
 service ServiceA{
@@ -25,69 +28,98 @@ service ServiceA{
         }
         interfaces: ServiceAInterface
     }
-    embed Outbox as OutboxService
-    embed Database as Database
-    embed Time as Time
+
+    outputPort IBOB {
+        Location: "local" //Overwritten in init
+        Interfaces: OutboxInterface 
+    }
+
     embed Console as Console
+    embed Database as Database
+    embed JsonUtils as JsonUtils
+    embed Runtime as Runtime
+    embed Time as Time
 
     init
     {
-        with ( connectionInfo ) 
-        {
-            .username = "";
-            .password = "";
-            .host = "";
-            .database = "file:database.sqlite"; // "." for memory-only
-            .driver = "sqlite"
+        with ( connectionInfo ){
+            .username = "postgres"
+            .password = "example"
+            .database = "service-a-db"
+            .driver = "postgresql"
+            .host = ""
         }
         
-        with ( pollSettings )
-        {
-            .pollAmount = 3
-            .pollDurationMS = 3000
-        }
-
-        with ( kafkaOptions )
-        {
-            .bootstrapServers =  "localhost:29092"
-            .groupId = "test-group"
-        }
-
-        with ( outboxSettings )
-        {
-            .pollSettings << pollSettings;
-            .databaseConnectionInfo << connectionInfo;
-            .brokerOptions << kafkaOptions
-        }
-        
-        connectKafka@OutboxService( outboxSettings ) ( outboxResponse )
         connect@Database( connectionInfo )( void )
+        update@Database( "CREATE TABLE IF NOT EXISTS Customers(username TEXT NOT NULL, " +
+            "dollarsSpent int)" )( ret )
 
-        scope ( createTable ) 
-        {
-            install ( SQLException => println@Console("Numbers table already exists")() )
-            updateRequest =
-                "CREATE TABLE IF NOT EXISTS Numbers(username VARCHAR(50) NOT NULL, " +
-                "number int)";
-            update@Database( updateRequest )( ret )
+        // Configuration parameters needed for the outbox service(s)
+        with ( outboxConfig ){
+            .pollTimer = 1;
+            .brokerOptions << {
+                .topic = "a-out"
+                .bootstrapServer = "localhost:29092"
+            }
+            .databaseServiceLocation << Database.location
         }
+
+        loadEmbeddedService@Runtime({
+            filepath = "InboxOutbox/ibob.ol"
+            params << { 
+                .outboxConfig << outboxConfig
+                }
+        })(IBOB.location)
     }
 
     main {
-        [ updateNumber( request )( response )
+        [ startChoreography( req )( res )
         {
-            scope ( InsertData )    //Update the number in the database
-            {   
-                install ( SQLException => println@Console( "SQL exception while trying to insert data" )( ) )
-                updateQuery.sqlQuery = "UPDATE Numbers SET number = number + 1 WHERE username = \"" + request.username + "\""
-                updateQuery.topic = "example"
-                updateQuery.key = request.username
-                updateQuery.value = "Updated number for " + request.username
+            // ProducerRecievedTime
+            getCurrentTimeMillis@Time( )( time )
+            print@Console(" " + time)()
 
-                transactionalOutboxUpdate@OutboxService( updateQuery )( updateResponse )
-
-                response = "Choreography Started!"
+            if (!is_defined(req.txHandle)){
+                beginTx@Database()(req.txHandle)
+                mustCommit = true
             }
+
+            // Check if the user exists, or if it needs to be created
+            query@Database( {
+                .query = "SELECT * FROM Customers WHERE username = '" + req.username + "';";
+                .txHandle = req.txHandle
+            } )( userExists )
+
+           // Create user if needed, otherwise update the number for the user
+            updateQuery.txHandle = req.txHandle
+            if (#userExists.row < 1){
+                updateQuery.update = "INSERT INTO Customers VALUES ('" + req.username + "', 0);"
+            } else{
+                updateQuery.update = "UPDATE Customers SET dollarsSpent = dollarsSpent + 1 WHERE username = '" + req.username + "'"
+            }
+
+            update@Database( updateQuery )( updateResponse )
+            
+            // To update Service B, this service needs to communicate to its outbox that it should put a message
+            // into kafka containing the operation and the request that we seek to call at                
+            with ( outboxQuery ){
+                .txHandle = req.txHandle;                               // The transaction handle for the ongoing transaction
+                .topic = "a-out";                                       // .topic = "a-out", which is where service B inbox listens
+                .operation = "react"                                    // This service wants to call serviceB.react
+                .parameters << {.username = req.username}               // The request to send to the operation
+            }
+            
+            updateOutbox@IBOB(outboxQuery)()
+            if (mustCommit){
+                commitTx@Database(req.txHandle)()
+                
+                //ProducerUpdateTime
+                getCurrentTimeMillis@Time( )( time )
+                print@Console(" " + time)()
+                
+                mustCommit = false
+            }
+            res = "Choreography initiated"
         }]
     }
 }

@@ -3,62 +3,83 @@ from .serviceBInterface import ServiceBInterface
 from console import Console
 from database import Database
 from runtime import Runtime
+from time import Time
 
 service ServiceB{
-    execution: sequential
+    execution: concurrent
     
     // Inputport used by the inbox
     inputPort ServiceBLocal {
         location: "local" 
-        protocol: http{
-            format = "json"
-        }
         interfaces: ServiceBInterface
     }
+
     embed Database as Database
     embed Console as Console
     embed Runtime as Runtime
+    embed Time as Time
     
     init {
         // Load the inbox service
-        getLocalLocation@Runtime(  )( localLocation )
-        loadEmbeddedService@Runtime( { 
-            filepath = "inboxService.ol"
-            params << { 
-                localLocation << localLocation
-                externalLocation << "socket://localhost:8082"
-            }
-        } )( _ )
+        with ( connectionInfo ){
+            .username = "postgres"
+            .password = "example"
+            .database = "service-b-db"
+            .driver = "postgresql"
+            .host = ""
+        }
 
-        with ( connectionInfo ) 
-        {
-            .username = "";
-            .password = "";
-            .host = "";
-            .database = "file:database.sqlite"; // "." for memory-only
-            .driver = "sqlite"
+        getLocalLocation@Runtime()(localLocation)
+
+        with ( inboxConfig ){
+            .pollTimer = 1;
+            .locations << {
+                .localLocation << localLocation;
+                .databaseServiceLocation << Database.location       
+            }
+            .kafkaOptions << {
+                .pollAmount = 5
+                .pollTimeout = 5000
+                .bootstrapServer = "localhost:29092"
+                .groupId = "service-b-consumer"
+                .topic = "a-out"
+            }
         }
 
         connect@Database( connectionInfo )( void )
-        update@Database("CREATE TABLE IF NOT EXISTS example(message VARCHAR(100));")()
+        update@Database("CREATE TABLE IF NOT EXISTS users(username TEXT, balance int);")()
+
+        loadEmbeddedService@Runtime({
+            filepath = "InboxOutbox/ibob.ol"
+            params << { 
+                .inboxConfig << inboxConfig
+                }
+        })()
     }
 
     main {
-        [updateNumberForUser( request )( response ){
-            query@Database( "SELECT * FROM inbox WHERE hasBeenRead = false" )( inboxMessages )
+        [react( req )( res ){
+            // Check if the user exists, or if it needs to be created
+            query@Database( {
+                .query = "SELECT * FROM users WHERE username = '" + req.username + "';";
+                .txHandle = req.txHandle
+            } )( userExists )
 
-            for ( row in inboxMessages.row ) 
-            {
-                println@Console("ServiceB: Checking inbox found update request " + row.request)()
-                transaction.statement[0] = "INSERT INTO example VALUES (\"" + row.request + "\");"
-                transaction.statement[1] = "UPDATE inbox SET hasBeenRead = true WHERE mid = \"" + row.mid + "\";"
-
-                println@Console(transaction.statement[0])()
-                println@Console(transaction.statement[1])()
-                executeTransaction@Database( transaction )(  )
+           // Create user if needed, otherwise update the number for the user
+            updateQuery.txHandle = req.txHandle
+            if (#userExists.row < 1){
+                updateQuery.update = "INSERT INTO users VALUES ('" + req.username + "', 100);"
+            } else{
+                updateQuery.update = "UPDATE users SET balance = balance - 1 WHERE username = '" + req.username + "'"
             }
-            response.code = 200
-            response.reason = "Updated locally"
+
+            //ConsumerUpdateTime
+            getCurrentTimeMillis@Time()( time )
+            print@Console(" " + time)()
+            update@Database(updateQuery)()
+
+            // No need to commit here, this is handled by the inbox
+            res = "Updated locally"
         }]
     }
 }

@@ -1,13 +1,11 @@
 type UpdateDatabaseRequest{
-    .userToUpdate: string
+    .username: string
+    .txHandle[0,1]: long
 }
 
-type UpdateDatabaseResponse {
-    .code: int
-    .reason: string
-}
+type UpdateDatabaseResponse: string
 
 interface ServiceBInterface{
     RequestResponse:
-        updateNumberForUser( UpdateDatabaseRequest )( UpdateDatabaseResponse )
+        react( UpdateDatabaseRequest )( UpdateDatabaseResponse )
 }

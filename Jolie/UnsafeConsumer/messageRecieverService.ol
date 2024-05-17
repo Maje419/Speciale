@@ -1,39 +1,40 @@
-include "console.iol"
-include "time.iol"
-include "serviceBInterface.iol"
+from .serviceBInterface import ServiceBInterface
+from .kafka-retriever-unsafe import KafkaConsumer, KafkaInboxOptions
 
-from .simple-kafka-connector import SimpleKafkaConsumer
+from json-utils import JsonUtils
+from console import Console
 
-type MRSInput{
+type MrsConfig{
+    .kafkaOptions: KafkaInboxOptions
     .mainServiceLocation: any
 }
 
-service MRS(p: MRSInput){
-    outputPort MainServicePort {
+service MRS(p: MrsConfig){
+    outputPort ServiceB {
         location: "local"
-        protocol: http{
-            format = "json"
-        }
         interfaces: ServiceBInterface
     }
-    embed SimpleKafkaConsumer as KafkaConsumer
+
+    embed Console as Console
+    embed KafkaConsumer as KafkaConsumer
+    embed JsonUtils as JsonUtils
 
     init
     {
-        MainServicePort.location << p.mainServiceLocation
+        ServiceB.location << p.mainServiceLocation
+        initialize@KafkaConsumer(p.kafkaOptions)()
     }
 
     main 
     {
-        Initialize@KafkaConsumer("Hi");
         while (true) {
-            Consume@KafkaConsumer("Consuming")( consumerMessage )
-            if (#consumerMessage.messages > 0){
-                println@Console( consumerMessage.code )(  )
-                for ( i = 0, i < #consumerMessage.messages, i++ ) {
-                    updateLocalDb@MainServicePort(consumerMessage.messages[i])
-                    println@Console("Message recieved from Kafka: " + consumerMessage.messages[i])()
-                }
+            consume@KafkaConsumer()( consumerMessage )
+            for ( i = 0, i < #consumerMessage.messages, i++ ) {
+                getJsonValue@JsonUtils(consumerMessage.messages[i].value)(kafkaValue)
+                //println@Console(consumerMessage.messages[i].value)()
+                getJsonValue@JsonUtils(kafkaValue.parameters)(pars)
+                //println@Console(pars.username)()
+                react@ServiceB(pars)()
             }
         }
     }

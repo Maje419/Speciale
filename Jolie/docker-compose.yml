@@ -23,15 +23,14 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   db:
-    image: postgres
+    image: maje419/thesis:postgres # An image with 3 databases for 'service-a', 'service-b' and 'service-c' created
     restart: always
     environment:
       POSTGRES_PASSWORD: example
-      POSTGRES_DB: example-db
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
       - 5432:5432
-
+      
 volumes:
   pgdata:
