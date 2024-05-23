@@ -7,7 +7,7 @@ from ..publicOutboxTypes import OutboxInterface
 from runtime import Runtime
 from console import Console
 from database import DatabaseInterface
-from string_utils import StringUtils
+from json-utils import JsonUtils
 from time import Time
 
 /**
@@ -36,9 +36,10 @@ service OutboxService(p: OutboxConfig){
         Interfaces: DatabaseInterface
     }
 
-    embed Runtime as Runtime
-    embed Time as Time
     embed Console as Console
+    embed Runtime as Runtime
+    embed JsonUtils as JsonUtils
+    embed Time as Time
 
     init {
         // Insert location of the Database service embedded in main service
@@ -50,24 +51,22 @@ service OutboxService(p: OutboxConfig){
             params << p
         })( MFS.location )
 
-        // Connect to the database
         update@Database( "CREATE TABLE IF NOT EXISTS outbox (operation TEXT, parameters TEXT, mid TEXT UNIQUE);" )( ret )
     }
     
     main {
         [updateOutbox( req )( res ){
-            install (ConnectionError => {
-                res.message = "Call to update before connecting!";
-                res.success = false
-            })
-
             // We assume that the proccessID is unique to this process, and the same process cannot handle two requests concurrently.
             // This means the combination of currentTime and processId is unique to this message
             getProcessId@Runtime( )( processId )
             getCurrentTimeMillis@Time()( timeMillis )
             messageId = processId + ":" + timeMillis
+            
+            getJsonString@JsonUtils(req.parameters)(params)
+            
+            println@Console("Outbox: " + params)()
 
-            updateMessagesTableQuery = "INSERT INTO outbox (operation, parameters, mid) VALUES ('" + req.operation + "', '" + req.parameters + "', '" + messageId + "');" 
+            updateMessagesTableQuery = "INSERT INTO outbox (operation, parameters, mid) VALUES ('" + req.operation + "', '" + params + "', '" + messageId + "');" 
             
             with ( updateRequest ){
                 .txHandle = req.txHandle;

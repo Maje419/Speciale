@@ -5,7 +5,7 @@ type KafkaInboxOptions: void {
     .pollTimeout[0, 1]: int                           //< How many ms the consumer will wait before returning that no new messages were found
     .bootstrapServer: string                    //< The URL of the kafka server to connect to, e.g. "localhost:9092"
     .groupId: string                            //< The group id that the consumer should be part of
-    .topic: string                              //< The topic that the message is attatched to
+    .topic: string                              //< The Kafka topic which the Inbox should listen on
 }
 
 /** Represents all information needed to initialize the Inbox service */

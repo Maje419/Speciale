@@ -1,8 +1,6 @@
 from database import Database
 from console import Console
-from file import File
 from runtime import Runtime
-from json-utils import JsonUtils
 
 from .serviceBInterface import ServiceBInterface
 from ..InboxOutbox.publicOutboxTypes import OutboxInterface
@@ -25,8 +23,6 @@ service ServiceB{
 
     embed Console as Console
     embed Database as Database
-    embed File as File
-    embed JsonUtils as JsonUtils
     embed Runtime as Runtime
 
     init {
@@ -85,42 +81,34 @@ service ServiceB{
         [react( req )( res )
         {   
             println@Console("Recieved message for operation react!")()
-            scope (ExecuteLocalupdate) {
-                with ( userExistsQuery ){
-                    .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "'";
-                    .txHandle = req.txHandle
-                }
-                query@Database( userExistsQuery )( userExists )
-                    
-                // Construct query which updates local state:
-                if (#userExists.row < 1)
-                {
-                    localUpdate.update = "INSERT INTO Numbers VALUES ('" + req.username + "', 0);"
-                } 
-                else
-                {
-                    localUpdate.update = "UPDATE Numbers SET number = number + 1 WHERE username = '" + req.username + "'"
-                }
-
-                localUpdate.txHandle = req.txHandle
-
-                update@Database( localUpdate )()
+            with ( userExistsQuery ){
+                .query = "SELECT * FROM Numbers WHERE username = '" + req.username + "'";
+                .txHandle = req.txHandle
             }
-
-            scope (UpdateOutbox){
-                with ( updateServiceCRequest ){
-                    .username = req.username
-                }
-                with ( outboxQuery ){
-                        .txHandle = req.txHandle;
-                        .topic = "b-out";
-                        .operation = "finalizeChoreography"
-                }
+            query@Database( userExistsQuery )( userExists )
                 
-                getJsonString@JsonUtils( updateServiceCRequest )( outboxQuery.parameters )
-
-                updateOutbox@IBOB( outboxQuery )( updateResponse )
+            // Construct query which updates local state:
+            if (#userExists.row < 1)
+            {
+                localUpdate.update = "INSERT INTO Numbers VALUES ('" + req.username + "', 0);"
+            } 
+            else
+            {
+                localUpdate.update = "UPDATE Numbers SET number = number + 1 WHERE username = '" + req.username + "'"
             }
+
+            localUpdate.txHandle = req.txHandle
+
+            update@Database( localUpdate )()
+
+            with ( outboxQuery ){
+                    .txHandle = req.txHandle;
+                    .topic = "b-out";
+                    .operation = "finalizeChoreography"
+                    .parameters << {.username = req.username}
+            }
+
+            updateOutbox@IBOB( outboxQuery )( updateResponse )
             res = "Service B has updated locally"
         }]
     }

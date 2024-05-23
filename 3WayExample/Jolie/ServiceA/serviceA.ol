@@ -1,8 +1,6 @@
 from database import Database
 from console import Console
-from file import File
 from runtime import Runtime
-from json-utils import JsonUtils
 
 from .serviceAInterface import ServiceAInterfaceExternal, ServiceAInterfaceLocal
 from ..InboxOutbox.publicOutboxTypes import OutboxInterface
@@ -28,9 +26,7 @@ service ServiceA{
     }
 
     embed Database as Database
-    embed File as File
     embed Console as Console
-    embed JsonUtils as JsonUtils
     embed Runtime as Runtime
 
     init
@@ -124,10 +120,8 @@ service ServiceA{
                     .txHandle = req.txHandle;                          // The transaction handle for the ongoing transaction
                     .topic = "a-out";       // .topic = "a-out", which is where service B inbox listens
                     .operation = "react"                   // This service wants to call serviceB.react
+                    .parameters << {.username = req.username}
                 }
-
-                // Parse the request that was supposed to be sent to serviceB into a json string, and enter it into the kafak message.value
-                getJsonString@JsonUtils( {.username = req.username} )(outboxQuery.parameters)
 
                 updateOutbox@IBOB( outboxQuery )( updateResponse )
 

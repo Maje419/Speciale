@@ -110,7 +110,7 @@ service ServiceA{
             }
             
             updateOutbox@IBOB(outboxQuery)()
-            if (mustCommit){
+            if (mustCommit){    // Usually, the Inbox services would take care of committing, but these are not initialized in this example
                 commitTx@Database(req.txHandle)()
                 
                 //ProducerUpdateTime

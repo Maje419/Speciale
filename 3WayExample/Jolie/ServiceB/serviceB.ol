@@ -1,8 +1,6 @@
 from database import Database
 from console import Console
-from file import File
 from runtime import Runtime
-from json-utils import JsonUtils
 
 from .serviceBInterface import ServiceBInterface
 from ..InboxOutbox.publicOutboxTypes import OutboxInterface
@@ -28,8 +26,6 @@ service ServiceB{
 
     embed Console as Console
     embed Database as Database
-    embed File as File
-    embed JsonUtils as JsonUtils
     embed Runtime as Runtime
 
     init {
@@ -115,8 +111,9 @@ service ServiceB{
                     .txHandle = req.txHandle;
                     .topic = "b-out";
                     .operation = "react"
+                    .parameters << {.username = req.username}
+
             }
-            getJsonString@JsonUtils( updateServiceCRequest )( outboxQuery.parameters )
 
             updateOutbox@IBOB( outboxQuery )( updateResponse )
         }]
