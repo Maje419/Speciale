@@ -86,7 +86,7 @@ service InboxWriterService (p: InboxConfig){
 
     main{
         [insertIntoInbox( req )( res ){
-            println@Console("Inbox: Storing incomming message for operation " + req.operation)()
+            //println@Console("Inbox: Storing incomming message for operation " + req.operation)()
             scope( MakeIdempotent )
             {
                 install( SQLException => res = "Problem inserting the message")
@@ -111,7 +111,7 @@ service InboxWriterService (p: InboxConfig){
 
         [recieveKafka( req )( res ) 
         {
-            println@Console("Inbox: Storing incomming message for operation " + req.key)()
+            //println@Console("Inbox: Storing incomming message for operation " + req.key)()
             scope( MakeIdempotent )
             {
                 install( SQLException => res = "Message already recieved" )

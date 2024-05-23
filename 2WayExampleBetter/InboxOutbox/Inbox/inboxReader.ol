@@ -67,7 +67,7 @@ service InboxReaderService (p: InboxConfig){
             query@Database("SELECT * FROM inbox;")( queryResponse );
             for ( row in queryResponse.row )
             {
-                println@Console("Inbox: Reading and processing message for operation " + row.operation )()
+                //println@Console("Inbox: Reading and processing message for operation " + row.operation )()
                 
                 // Initialize a new transaction to pass onto Service A
                 beginTx@Database()(txHandle)
@@ -108,7 +108,7 @@ service InboxReaderService (p: InboxConfig){
 
                     invokeRRUnsafe@Reflection( embedderInvokationRequest )()
                     commitTx@Database( txHandle )( ret )
-                    println@Console("Inbox: Sucessfully committed update for operation " + row.operation + "\n" )()
+                    //println@Console("Inbox: Sucessfully committed update for operation " + row.operation + "\n" )()
                 }
             }
 

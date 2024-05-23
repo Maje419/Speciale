@@ -17,7 +17,7 @@ type OutboxConfig{
 type UpdateOutboxRequest{
     .txHandle: long                                 //< The transaction handle
     .operation: string                              //< The operation to be called on the receiver service
-    .parameters: string                             //< A json representation of the request to pass to .operation
+    .parameters: any {?}                            //< A json representation of the request to pass to .operation
     .topic: string                                  //< The kafka topic on which the update should be broadcast
 }
 

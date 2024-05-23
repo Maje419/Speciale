@@ -19,7 +19,7 @@ service ServiceA{
         interfaces: ServiceAInterfaceLocal
     }
 
-    // This service is responsible for 
+    // Port for sending messages to the IBOB service
     outputPort IBOB {
         Location: "local"
         protocol: http{

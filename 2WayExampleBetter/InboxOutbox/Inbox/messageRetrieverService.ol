@@ -71,7 +71,7 @@ service MessageRetriever(p: MRSEmbeddingConfig) {
             }
 
             scheduleTimeout@Time( p.pollTimer{
-                    operation = "beginReading"
+                operation = "beginReading"
             } )(  )
         }
     }
