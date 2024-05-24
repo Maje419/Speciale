@@ -64,7 +64,7 @@ service InboxReaderService (p: InboxConfig){
     {
         [beginReading()]{
             // Read any messages left in the 'inbox' table
-            query@Database("SELECT * FROM inbox;")( queryResponse );
+            query@Database("SELECT * FROM inbox WHERE handled = false;")( queryResponse );
             for ( row in queryResponse.row )
             {
                 //println@Console("Inbox: Reading and processing message for operation " + row.operation )()
@@ -76,7 +76,7 @@ service InboxReaderService (p: InboxConfig){
                 with( updateRequest )
                 {
                     .txHandle = txHandle;
-                    .update = "DELETE FROM inbox WHERE arrivedFromKafka = " + row.arrivedfromkafka + 
+                    .update = "UPDATE inbox SET handled = true WHERE arrivedFromKafka = " + row.arrivedfromkafka + 
                             " AND messageId = '" + row.messageid + "';"
                 }
 

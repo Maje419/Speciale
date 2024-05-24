@@ -19,13 +19,13 @@ interface InboxWriterKafkaInterface {
 /**
 *   This service handles receiving messages, and inserting them into the 'inbox' table.
 *       Inbox table:
-*           ____________________________________________________________________________
-*           |       operation      |       parameters      |   arrivedFromKafka  |  messageId  |
-*           |——————————————————————|———————————————————————|—————————————————————|—————————————|
-*           |     "startChor..."   |  {"username":"user1"} |           F         |    42       |
-*           |——————————————————————|———————————————————————|—————————————————————|—————————————|
-*           |     "finalizeChor"   |  {"username":"user3"} |           T         |    42       |
-*           |——————————————————————|———————————————————————|—————————————————————|—————————————|
+*           ____________________________________________________________________________________________________
+*           |       operation      |       parameters      |   arrivedFromKafka  |  messageId  |    handled     |
+*           |——————————————————————|———————————————————————|—————————————————————|—————————————|————————————————|
+*           |     "startChor..."   |  {"username":"user1"} |           F         |    42       |       T        |
+*           |——————————————————————|———————————————————————|—————————————————————|—————————————|————————————————|
+*           |     "finalizeChor"   |  {"username":"user3"} |           T         |    42       |       F        |
+*           |——————————————————————|———————————————————————|—————————————————————|—————————————|————————————————|
 */
 service InboxWriterService (p: InboxConfig){
     execution: concurrent
@@ -67,7 +67,7 @@ service InboxWriterService (p: InboxConfig){
         // Another issue arrises if Service B recieves messages on different topics, but in such a case, it would
         // suffice to introduce the topic as a part of the unique constraint.
         update@Database( 
-            "CREATE TABLE IF NOT EXISTS inbox (operation VARCHAR (150), parameters TEXT, arrivedFromKafka BOOL, messageId TEXT, UNIQUE(arrivedFromKafka, messageId));" 
+            "CREATE TABLE IF NOT EXISTS inbox (operation VARCHAR (150), parameters TEXT, arrivedFromKafka BOOL, messageId TEXT, handled BOOL, UNIQUE(arrivedFromKafka, messageId));" 
             )( ret )
 
         // This service handles inserting messages into the 'Inbox' table. Messages can be recieved from a socket location, or from Kafka.
@@ -96,14 +96,14 @@ service InboxWriterService (p: InboxConfig){
                 // If an Id is provided, we can assure exactly-once-delivery even at this step
                 if ( req.request.id instanceof string )
                 {
-                    update@Database("INSERT INTO inbox (operation, parameters, arrivedFromKafka, messageId) VALUES ('" + req.operation + "','" + inboxRequest + "', false, '" + req.id + "');")()
+                    update@Database("INSERT INTO inbox (operation, parameters, arrivedFromKafka, messageId, handled) VALUES ('" + req.operation + "','" + inboxRequest + "', false, '" + req.id + "', false);")()
                 } 
                 else // req.request.id instanceof void
                 {
                     getProcessId@Runtime( )( processId )
                     getCurrentTimeMillis@Time()( timeMillis )
                     messageId = processId + ":" + timeMillis
-                    update@Database("INSERT INTO inbox (operation, parameters, arrivedFromKafka, messageId) VALUES ('" + req.operation + "','" + inboxRequest + "', false, '" + messageId + "');")()
+                    update@Database("INSERT INTO inbox (operation, parameters, arrivedFromKafka, messageId, handled) VALUES ('" + req.operation + "','" + inboxRequest + "', false, '" + messageId + "', false);")()
                 }
             }
             res = "Message stored"
@@ -119,7 +119,7 @@ service InboxWriterService (p: InboxConfig){
                 getJsonValue@JsonUtils( req.value )( kafkaValue )
 
                 // As per protocol, the key will be the operation, and the value a string containing the request. 
-                update@Database("INSERT INTO inbox (operation, parameters, arrivedFromKafka, messageId) VALUES ('" + req.key + "','" + kafkaValue.parameters + "', true, '" + kafkaValue.mid  + "');")()
+                update@Database("INSERT INTO inbox (operation, parameters, arrivedFromKafka, messageId, handled) VALUES ('" + req.key + "','" + kafkaValue.parameters + "', true, '" + kafkaValue.mid  + "', false);")()
                 
                 res = "Message stored"
             }

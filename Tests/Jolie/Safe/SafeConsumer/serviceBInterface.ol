@@ -1,16 +1,13 @@
-from ..test.testTypes import ProducerTests, TestExceptionType
+from ..test.testTypes import TestExceptionType
 
 type UpdateDatabaseRequest{
-    .userToUpdate: string
+    .username: string
+    .txHandle[0,1]: long
 }
 
-type UpdateDatabaseResponse {
-    .code: int
-    .reason: string
-}
+type UpdateDatabaseResponse: string
 
 interface ServiceBInterface{
     RequestResponse:
-        updateNumberForUser( UpdateDatabaseRequest )( UpdateDatabaseResponse ),
-        setupTest( ProducerTests )( bool )
+        react( UpdateDatabaseRequest )( UpdateDatabaseResponse ) throws TestException(TestExceptionType)
 }

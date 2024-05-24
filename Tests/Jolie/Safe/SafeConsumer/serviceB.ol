@@ -1,9 +1,11 @@
 from .serviceBInterface import ServiceBInterface
-from .inboxTypes import InboxInterface
 
 from console import Console
 from database import Database
 from runtime import Runtime
+from time import Time
+
+from ..test.testTypes import ConsumerTestInterface
 
 service ServiceB{
     execution: concurrent
@@ -11,74 +13,93 @@ service ServiceB{
     // Inputport used by the inbox
     inputPort ServiceBLocal {
         location: "local" 
-        protocol: http{
-            format = "json"
-        }
-        interfaces: ServiceBInterface
+        interfaces: ServiceBInterface, ConsumerTestInterface
     }
 
-    // This OPP is here for setting up tests in the inbox
-    outputPort InboxService {
-        Location: "local"   //overwritten in init
-        Interfaces:  InboxInterface
+    outputPort IBOB {
+        Location: "local"
+        Interfaces: ConsumerTestInterface 
     }
 
     embed Database as Database
     embed Console as Console
     embed Runtime as Runtime
+    embed Time as Time
     
     init {
         // Load the inbox service
-        getLocalLocation@Runtime(  )( localLocation )
-        loadEmbeddedService@Runtime( { 
-            filepath = "./SafeConsumer/inboxService.ol"
-            params << { 
-                localLocation << localLocation
-                externalLocation << "socket://localhost:8082"
-            }
-        } )( InboxService.location )
+        with ( connectionInfo ){
+            .username = "postgres"
+            .password = "example"
+            .database = "service-b-db"
+            .driver = "postgresql"
+            .host = ""
+        }
 
-        with ( connectionInfo ) 
-        {
-            .username = "";
-            .password = "";
-            .host = "";
-            .database = "file:database.sqlite"; // "." for memory-only
-            .driver = "sqlite"
+        getLocalLocation@Runtime()(localLocation)
+
+        with ( inboxConfig ){
+            .pollTimer = 1;
+            .locations << {
+                .localLocation << localLocation;
+                .databaseServiceLocation << Database.location       
+            }
+            .kafkaOptions << {
+                .pollAmount = 5
+                .pollTimeout = 5000
+                .bootstrapServer = "localhost:29092"
+                .groupId = "service-b-consumer"
+                .topic = "a-out"
+            }
         }
 
         connect@Database( connectionInfo )( void )
-        update@Database("CREATE TABLE IF NOT EXISTS example(message VARCHAR(100));")()
+        update@Database("CREATE TABLE IF NOT EXISTS users(username TEXT, balance int);")()
+
+        loadEmbeddedService@Runtime({
+            filepath = "InboxOutbox/ibob.ol"
+            params << { 
+                .inboxConfig << inboxConfig
+                }
+        })(IBOB.location)
     }
 
     main {
-        [updateNumberForUser( request )( response ){
-            if (global.testParams.throw_before_search_inbox){
-                throw ( TestException, "throw_before_search_inbox" )
+        [react( req )( res ){
+            if (global.testParams.throw_on_message_received){
+                global.hasThrownAfterForMessage = true
+                throw ( TestException, "throw_on_message_received" )
             }
-            query@Database( "SELECT * FROM inbox WHERE hasBeenRead = false" )( inboxMessages )
 
-            for ( row in inboxMessages.row ) 
-            {
-                if (global.testParams.throw_at_inbox_message_found && !global.hasThrownAfterForMessage){
-                    // Ensure that for testing, this method only 'crashes' the first time for some message
-                    global.hasThrownAfterForMessage = true
-                    throw ( TestException, "throw_at_inbox_message_found" )
-                }
+            // Check if the user exists, or if it needs to be created
+            query@Database( {
+                .query = "SELECT * FROM users WHERE username = '" + req.username + "';";
+                .txHandle = req.txHandle
+            } )( userExists )
 
-                transaction.statement[0] = "INSERT INTO example VALUES (\"" + row.request + "\");"
-                transaction.statement[1] = "UPDATE inbox SET hasBeenRead = true WHERE mid = \"" + row.mid + "\";"
-
-                executeTransaction@Database( transaction )(  )
-
+           // Create user if needed, otherwise update the number for the user
+            updateQuery.txHandle = req.txHandle
+            if (#userExists.row < 1){
+                updateQuery.update = "INSERT INTO users VALUES ('" + req.username + "', 100);"
+            } else{
+                updateQuery.update = "UPDATE users SET balance = balance - 1 WHERE username = '" + req.username + "'"
             }
-            response.code = 200
-            response.reason = "Updated locally"
+
+            update@Database(updateQuery)()
+
+            if (global.testParams.throw_after_local_update){
+                global.hasThrownAfterForMessage = true
+                throw ( TestException, "throw_after_local_update" )
+            }
+
+            // No need to commit here, this is handled by the inbox
+            res = "Updated locally"
         }]
 
-        [setupTest( request )( response ){
+        [setupConsumerTests(req)(res){
             global.testParams << request.serviceB
-            setupTest@InboxService(request)(response)
+            global.hasThrownAfterForMessage = false
+            setupConsumerTests@IBOB(req)(res)
         }]
     }
 }

@@ -1,7 +1,9 @@
-/***** Consumer tests ******/
+/***** Producer tests ******/
 type ServiceATests{
-    .throw_before_outbox_call*: bool
-    .throw_after_outbox_call*: bool
+    .throw_on_recieved*: bool
+    .throw_after_update_local*: bool
+    .throw_before_commit*: bool
+    .throw_after_commit*: bool
 }
 
 type OutboxTestParams {
@@ -15,32 +17,49 @@ type MFSTestParams {
     .throw_after_send_but_before_delete*: bool
 }
 
-type ConsumerTests{
+type ProducerTests{
     .serviceA*: ServiceATests
     .outboxtests*: OutboxTestParams
     .mfsTests*: MFSTestParams
 }
 
-/***** Producer tests ******/
+/***** Consumer tests ******/
 type ServiceBTests{
-    .throw_before_search_inbox*: bool
-    .throw_at_inbox_message_found*: bool
+    .throw_on_message_received*: bool
+    .throw_after_local_update*: bool
 }
 
-type InboxTestParams{
+type InboxWriterTests{
     .throw_before_updating_inbox*: bool
-    .throw_before_updating_main_service*: bool
+    .throw_after_updating_inbox_but_before_response*: bool
 }
 
-type MRSTestParams{
+type InboxReaderTests{
+    .throw_before_begin_tx*: bool
+    .throw_after_update_inbox*: bool
+}
+
+type MRSTests{
     .throw_after_message_found*: bool
     .throw_after_notify_inbox_but_before_commit_to_kafka*: bool
 }
 
-type ProducerTests {
+type ConsumerTests {
     .serviceB*: ServiceBTests
-    .inboxTests*: InboxTestParams
-    .mrsTests*: MRSTestParams
+    .inboxWriterTests*: InboxWriterTests
+    .inboxReaderTests*: InboxReaderTests
+    .mrsTests*: MRSTests
 }
 
 type TestExceptionType: string
+
+
+interface ProducerTestInterface{
+    RequestResponse:
+        setupProducerTests( ProducerTests )( bool ) 
+}
+
+interface ConsumerTestInterface{
+    RequestResponse:
+        setupConsumerTests( ConsumerTests )( bool ) 
+}
