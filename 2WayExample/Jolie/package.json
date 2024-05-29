@@ -1,0 +1,21 @@
+{
+  "name": "2wayexample",
+  "version": "1.0.0",
+  "description": "Can be used to run an example of 2 services implementing the inbox/outbox pattern",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "run-docker": "docker-compose up -d",
+    "await-docker-upstart": "sleep 10",
+    "run-services": "concurrently --names ServiceA,ServiceB --handle-input --default-input-target 2 \"jolie ServiceA/serviceA.ol\" \"jolie ServiceB/serviceB.ol\" \"sleep 8 &&./reader.sh\"",
+    "start": "run-s run-docker await-docker-upstart run-services"
+  },
+  "author": "Mathias Jensen",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "npm-run-all": "^4.1.5"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "jolie",
+  "version": "1.0.0",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "run-docker": "docker-compose up -d",
+    "await-docker-upstart": "sleep 10",
+    "run-safe": "concurrently \"jolie SafeProducer/serviceA.ol\" \"jolie SafeConsumer/serviceB.ol\"",
+    "services-safe": "concurrently -r \"jolie SafeProducer/serviceA.ol >> results/tempResults.csv\" \"jolie SafeConsumer/serviceB.ol >> results/tempResults.csv\"",
+    "services-unsafe": "concurrently -r \"jolie UnsafeProducer/serviceA.ol >> results/tempResults.csv\" \"jolie UnsafeConsumer/serviceB.ol >> results/tempResults.csv\"",
+    "record-safe": "run-s run-docker await-docker-upstart services-safe",
+    "record-unsafe": "run-s run-docker await-docker-upstart services-unsafe"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "npm-run-all": "^4.1.5"
+  }
+}
