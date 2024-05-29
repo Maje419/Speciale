@@ -7,11 +7,15 @@
     "lib": "lib"
   },
   "scripts": {
-    "start": "concurrently --names ServiceA,ServiceB,ServiceC --handle-input --default-input-target 3 \"jolie ServiceA/serviceA.ol\" \"jolie ServiceB/serviceB.ol\" \"jolie ServiceC/serviceC.ol\" \"sleep 8 &&./reader.sh\""
+    "run-docker": "docker-compose up -d",
+    "await-docker-upstart": "sleep 10",
+    "run-services": "concurrently --names ServiceA,ServiceB,ServiceC --handle-input --default-input-target 3 \"jolie ServiceA/serviceA.ol\" \"jolie ServiceB/serviceB.ol\" \"jolie ServiceC/serviceC.ol\" \"sleep 8 &&./reader.sh\"",
+    "start": "run-s run-docker await-docker-upstart run-services"
   },
   "author": "Mathias Jensen",
   "license": "ISC",
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "npm-run-all": "^4.1.5"
   }
 }
