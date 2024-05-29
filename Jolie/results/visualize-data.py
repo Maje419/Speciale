@@ -1,4 +1,5 @@
 import pandas as pds
+import numpy as np
 from matplotlib import pyplot as plt
 
 plt.figure()
@@ -11,9 +12,10 @@ def graphMean(fileName: str,  label = None, ax = None):
 
     # Don't care about the id column
     df = df.drop(columns=['RequestId'])
+    df = df.drop(columns=['SentTime'])
 
-    # Copy the SentTime column, as this is the one we normalize around
-    sentTime = df["SentTime"]
+    # Copy the ProducerRecievedTime column, as this is the one we normalize around
+    sentTime = df["ProducerRecievedTime"]
 
     # For every other column, normalize to ms after SentTime
     for column in df.columns:
@@ -21,13 +23,15 @@ def graphMean(fileName: str,  label = None, ax = None):
 
     # Find the mean of each column
     mean = df.mean()
+
     if (ax == None):
-        return mean.plot(rot=0, title="Message propagation time", label = label, ylabel="ms after Curl request sent", xlabel="step", legend=True)
+        return mean.plot(rot=0, title="Message propagation time", label = label, ylabel="Time (Avg. ms)", xlabel="Step", legend=True)
     else:
         return mean.plot(ax=ax, label=label, legend=True)
 
-ax = graphMean("safe-safe_10.csv", "safe-safe_10")
-graphMean("safe-safe_1.csv", "safe-safe_1", ax)
-graphMean("safe-safe_100.csv", "safe-safe_100", ax)
-graphMean("unsafe-unsafe.csv", "unsafe-unsafe", ax)
+# ax = graphMean("safe-safe_10.csv", "Outbox and Inbox, 10 ms")
+# graphMean("safe-safe_1.csv", "Outbox and Inbox, 1 ms", ax)
+# graphMean("safe-safe_100.csv", "Outbox and Inbox, 100 ms", ax)
+# graphMean("unsafe-unsafe.csv", "No Outbox and Inbox", ax)
+
 plt.show()

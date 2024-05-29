@@ -32,7 +32,7 @@ service ServiceB{
         getLocalLocation@Runtime()(localLocation)
 
         with ( inboxConfig ){
-            .pollTimer = 1;
+            .pollTimer = 100;
             .locations << {
                 .localLocation << localLocation;
                 .databaseServiceLocation << Database.location       

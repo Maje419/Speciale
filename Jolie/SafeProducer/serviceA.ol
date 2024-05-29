@@ -56,7 +56,7 @@ service ServiceA{
 
         // Configuration parameters needed for the outbox service(s)
         with ( outboxConfig ){
-            .pollTimer = 1;
+            .pollTimer = 100;
             .brokerOptions << {
                 .topic = "a-out"
                 .bootstrapServer = "localhost:29092"

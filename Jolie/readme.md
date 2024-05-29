@@ -1,6 +1,5 @@
 Make sure the new version of DatabaseService is included in your Jolie install. To do this, follow the guide for 'compiling from source' here: https://www.jolie-lang.org/downloads.html - Remember to clone the Maje419/jolie repository inststead in the first step.
-To run the tests, take the following steps:
-1. Run the docker-compose with the command 'docker-compose up' from this directory
-2. From a second and third terminal window, run one instance of the producer and one of the consumers by the command 'jolie SafeProducer/serviceA.ol' and 'jolie SafeConsumer/serviceB.ol'. Exchange 'Safe' with 'Unsafe' to run version without Inbox/Outbox library.
-3. From a fourth terminal window, run the python script 'results/record-data.py'.
-4. The measurements will now be written to the file opened in the 'record-data.py' python script.
+1. Run the command 'npm install' to install necessary packages
+2. Run the command 'npm run record' to start all needed docker containers as well as Service A and Service B - (npm run run-services to run services w.o. writing timings to file)
+3. To initiate the choreography once, send a curl request to endpoint 'http://localhost:8080/startChoreography?username=user1'
+4. To run all measurements, run the python script 'results/record-data.py'. The data will be recorded to the 'results/tempResults.csv' file if the record command was used.
