@@ -1,0 +1,17 @@
+{
+  "test": "test/functionality",
+  "params": { 
+    "TestDatabase.ol": [ 
+      {
+        "name": "TestDatabase",
+        "params": {
+          "username": "",
+          "password": "",
+          "database": "file:testDatabase",
+          "driver": "hsqldb_embedded",
+          "host": "123"
+        }
+      }
+    ]
+  }
+}

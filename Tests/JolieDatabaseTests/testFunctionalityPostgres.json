@@ -1,0 +1,17 @@
+{
+  "test": "test/functionality",
+  "params": { 
+    "TestDatabase.ol": [ 
+      {
+        "name": "TestDatabase",
+        "params": {
+          "username": "postgres",
+          "password": "example",
+          "database": "service-a-db",
+          "driver": "postgresql",
+          "host": ""
+        }
+      }
+    ]
+  }
+}

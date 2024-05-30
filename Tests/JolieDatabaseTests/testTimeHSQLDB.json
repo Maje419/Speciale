@@ -1,0 +1,17 @@
+{
+    "test": "test/time",
+    "params": {
+        "TimedTests.ol": [ 
+        {
+        "name": "TimedTests",
+        "params": {
+            "username": "",
+            "password": "",
+            "database": "file:testDatabase2",
+            "driver": "hsqldb_embedded",
+            "host": "123"
+        }
+      }
+    ]
+    }
+}

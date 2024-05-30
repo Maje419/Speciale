@@ -1,0 +1,17 @@
+{
+    "test": "test/time",
+    "params": {
+        "TimedTests.ol": [ 
+        {
+        "name": "TimedTests",
+        "params": {
+            "username": "postgres",
+            "password": "example",
+            "database": "service-a-db",
+            "driver": "postgresql",
+            "host": ""
+        }
+      }
+    ]
+    }
+}
