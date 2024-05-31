@@ -51,13 +51,14 @@ service OutboxService(p: OutboxConfig){
         // Insert location of the Database service embedded in main service
         Database.location << p.databaseServiceLocation
 
+        update@Database( "CREATE TABLE IF NOT EXISTS outbox (operation TEXT, parameters TEXT, mid TEXT UNIQUE);" )( ret )
+
         // Load MFS
         loadEmbeddedService@Runtime({
             filepath = "messageForwarderService.ol"
             params << p
         })( MFS.location )
 
-        update@Database( "CREATE TABLE IF NOT EXISTS outbox (operation TEXT, parameters TEXT, mid TEXT UNIQUE);" )( ret )
     }
     
     main {
