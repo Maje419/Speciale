@@ -12,8 +12,8 @@ def getMean(path: str) -> pd.DataFrame:
     df = pd.read_csv(filepath_or_buffer=path, sep=' ')
     return df.groupby("test").mean()
 
-noConnectionpoolDf = getMean("results/JDBC_Postgres.csv")
-connectionPoolDf = getMean("results/Hikari_Postgres.csv")
+noConnectionpoolDf = getMean("results/JDBC_HSQL.csv")
+connectionPoolDf = getMean("results/Hikari_HSQL.csv")
 
 index = connectionPoolDf.columns
 

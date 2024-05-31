@@ -19,7 +19,7 @@ def getDataframe(path: str) -> pd.DataFrame:
 
     return dfNew.groupby("test").mean()
 
-df = getDataframe("results/Hikari_Postgres.csv")
+df = getDataframe("results/Hikari_HSQL.csv")
 
 df.columns = ["Using beginTx", "No transaction"]
 
